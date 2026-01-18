@@ -44,6 +44,9 @@ private slots:
     void onContinuousDetect();
     void onContinuousCapture();
     void stopAllMonitoring();
+    void mode1();//模式1--OCR监测
+    void mode2();//模式2
+    void newOCR();//新版OCR
     // 接收fuzhu窗口传递的区域参数的槽函数
     void onAreaParamsReceived(int startXPercent, int widthPercent, int startYPercent, int heightPercent);
 
@@ -56,6 +59,7 @@ private:
     QTextEdit *logTextEdit;
     QPushButton *startButton;
     QPushButton *stopButton;
+    QPushButton *AreaButton;//区域配置
     QPushButton *configButton;
     QTimer *timer;
 

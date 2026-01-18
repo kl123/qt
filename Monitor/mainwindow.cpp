@@ -10,6 +10,7 @@
 #include "image.h"
 #include <QSettings>
 #include <QDebug>
+#include <QMessageBox>
 #include "fuzhu.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -18,6 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
       croppedLabel(new QLabel(this)),
       logTextEdit(new QTextEdit(this)),
       startButton(new QPushButton("模式1:关键词监测", this)),
+      AreaButton(new QPushButton("区域选定", this)),
       stopButton(new QPushButton("停止监测", this)),
       configButton(new QPushButton("参数配置", this)),
       timer(new QTimer(this)),
@@ -52,16 +54,18 @@ MainWindow::MainWindow(QWidget *parent)
     connect(startButton, &QPushButton::clicked, this, &MainWindow::onStartMonitoring);
     connect(stopButton, &QPushButton::clicked, this, &MainWindow::onStopMonitoring);
     connect(configButton, &QPushButton::clicked, this, &MainWindow::openConfig);
-    connect(timer, &QTimer::timeout, this, &MainWindow::onCaptureScreen);
+    connect(timer, &QTimer::timeout, this, &MainWindow::newOCR);
     connect(testAlertButton, &QPushButton::clicked, this, &MainWindow::onTestAlert);
     connect(viewHistoryButton, &QPushButton::clicked, this, &MainWindow::onViewHistory);
-    connect(continuousDetectButton, &QPushButton::clicked, this, &MainWindow::onContinuousDetect);
+    connect(continuousDetectButton, &QPushButton::clicked, this, &MainWindow::mode2);
     connect(continuousTimer, &QTimer::timeout, this, &MainWindow::onContinuousCapture);
+    connect(AreaButton,&QPushButton::clicked,this,&MainWindow::onContinuousDetect);
 
     // 按钮布局：确保两个主模式按钮相邻
     QHBoxLayout *modeButtonLayout = new QHBoxLayout;
     modeButtonLayout->addWidget(startButton);
     modeButtonLayout->addWidget(continuousDetectButton);
+    modeButtonLayout->addWidget(AreaButton);
 
     QHBoxLayout *auxButtonLayout = new QHBoxLayout;
     auxButtonLayout->addWidget(stopButton);
@@ -89,7 +93,7 @@ MainWindow::MainWindow(QWidget *parent)
     resize(600, 450);
 
     // 初始状态
-    startButton->setEnabled(false);
+    startButton->setEnabled(true);
     continuousDetectButton->setEnabled(true);
     stopButton->setEnabled(false);
 }
@@ -120,6 +124,7 @@ void MainWindow::stopAllMonitoring()
 
     // 恢复按钮状态
     continuousDetectButton->setEnabled(true);
+    startButton->setEnabled(true);
     stopButton->setEnabled(false);
 
     logTextEdit->append("[系统] 所有监测已停止");
@@ -216,24 +221,16 @@ void MainWindow::onAreaParamsReceived(int startXPercent, int widthPercent, int s
 // 模式2：仅打开fuzhu窗口，不直接启动监测
 void MainWindow::onContinuousDetect()
 {
-    // 若当前正在监测，先停止（可选：根据需求决定是否允许重复操作）
-    if (isContinuousDetecting) {
-        stopAllMonitoring();
-        return;
-    }
-
+    // 停止检测
+    stopAllMonitoring();
     // ===== 每次点击都创建新的fuzhu窗口（关闭后自动销毁，无内存泄漏） =====
     fuzhu *w1 = new fuzhu(this);
-    // 连接fuzhu的信号到MainWindow的槽函数
-    connect(w1, &fuzhu::areaParamsConfirmed, this, &MainWindow::onAreaParamsReceived);
     // 窗口关闭后自动释放内存（避免内存泄漏）
     connect(w1, &fuzhu::destroyed, w1, &QObject::deleteLater);
     w1->show();
-
-    logTextEdit->append("[连续检测] 请在辅助窗口中设置监测区域并点击确定...");
 }
 
-// 主监测：屏幕捕捉与 OCR
+// 主监测：屏幕捕捉与 OCR(旧版)
 void MainWindow::onCaptureScreen()
 {
     QScreen *screen = QGuiApplication::primaryScreen();
@@ -496,4 +493,239 @@ void MainWindow::onContinuousCapture()
     cv::cvtColor(displayCropped, displayCropped, cv::COLOR_BGR2RGB);
     QImage imgCropped(displayCropped.data, displayCropped.cols, displayCropped.rows, displayCropped.step, QImage::Format_RGB888);
     croppedLabel->setPixmap(QPixmap::fromImage(imgCropped).scaled(croppedLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+}
+void MainWindow::mode2()
+{
+    // 1. 先停止当前可能正在运行的连续检测（避免重复启动）
+    if (isContinuousDetecting) {
+        stopAllMonitoring();
+        return;
+    }
+
+    // 2. 获取配置实例，检查检测区域+卡片区域的完整配置
+    QSettings settings("MyCompany", "MonitorApp");
+
+    // 检测区域配置项（4个参数必须都存在）
+    bool hasDetectConfig = settings.contains("detectStartX") && settings.contains("detectWidth") &&
+                           settings.contains("detectStartY") && settings.contains("detectHeight");
+    // 卡片区域配置项（4个参数必须都存在）
+    bool hasCardConfig = settings.contains("cardStartX") && settings.contains("cardWidth") &&
+                         settings.contains("cardStartY") && settings.contains("cardHeight");
+
+    // 3. 配置不完整则弹窗提示
+    if (!hasDetectConfig || !hasCardConfig) {
+        QMessageBox::warning(this, "配置缺失", "需要先进行区域选定！\n请点击「区域选定」按钮完成检测区域和卡片区域的框选。", QMessageBox::Ok);
+        logTextEdit->append("<font color='red'><b>[模式2] 启动失败：未检测到完整的区域配置，请先完成区域选定</b></font>");
+        return;
+    }
+
+    // 4. 配置完整，读取参数并启动连续检测
+    // 读取监测区域参数（用于裁剪）
+    m_areaStartX = settings.value("detectStartX").toInt();
+    m_areaWidth = settings.value("detectWidth").toInt();
+    m_areaStartY = settings.value("detectStartY").toInt();
+    m_areaHeight = settings.value("detectHeight").toInt();
+
+    // 读取检测间隔（默认2秒）
+    int interval = settings.value("detectionInterval", 2).toInt() * 1000;
+
+    // 启动定时器
+    continuousTimer->start(interval);
+    isContinuousDetecting = true;
+
+    // 更新按钮状态
+    continuousDetectButton->setText("模式2:停止屏幕变化检测");
+    startButton->setEnabled(false);  // 模式1禁用
+    stopButton->setEnabled(true);    // 停止按钮启用
+
+    // 日志记录
+    logTextEdit->append(QString("[模式2] 启动成功！"));
+    logTextEdit->append(QString("[模式2] 监测间隔：%1秒 | 监测区域：X%2%（宽%3%），Y%4%（高%5%）")
+                        .arg(interval/1000)
+                        .arg(m_areaStartX).arg(m_areaWidth)
+                        .arg(m_areaStartY).arg(m_areaHeight));
+}
+void MainWindow::mode1(){
+    // 1. 先停止当前可能正在运行的连续检测（避免重复启动）
+       if (isContinuousDetecting) {
+           stopAllMonitoring();
+           return;
+       }
+
+       // 2. 获取配置实例，检查检测区域+卡片区域的完整配置
+       QSettings settings("MyCompany", "MonitorApp");
+
+       // 检测区域配置项（4个参数必须都存在）
+       bool hasDetectConfig = settings.contains("detectStartX") && settings.contains("detectWidth") &&
+                              settings.contains("detectStartY") && settings.contains("detectHeight");
+       // 卡片区域配置项（4个参数必须都存在）
+       bool hasCardConfig = settings.contains("cardStartX") && settings.contains("cardWidth") &&
+                            settings.contains("cardStartY") && settings.contains("cardHeight");
+
+       // 3. 配置不完整则弹窗提示
+       if (!hasDetectConfig || !hasCardConfig) {
+           QMessageBox::warning(this, "配置缺失", "需要先进行区域选定！\n请点击「区域选定」按钮完成检测区域和卡片区域的框选。", QMessageBox::Ok);
+           logTextEdit->append("<font color='red'><b>[模式1] 启动失败：未检测到完整的区域配置，请先完成区域选定</b></font>");
+           return;
+       }
+
+       // 4. 配置完整，读取参数并启动模式1监测
+       // 读取检测间隔（默认5秒）
+       int intervalSeconds = settings.value("detectionInterval", 5).toInt();
+
+       // 启动模式1定时器
+       if (!timer->isActive()) {
+           timer->start(intervalSeconds * 1000);
+
+           // 更新状态和按钮
+           isMonitoringActive = false; // 初始标记为未激活，等待首次计时
+           monitoringStartTime = QDateTime::currentDateTime();
+           startButton->setEnabled(false);
+           continuousDetectButton->setEnabled(false);
+           stopButton->setEnabled(true);
+
+           // 日志记录
+           logTextEdit->append(QString("[模式1] 启动成功！监测间隔：%1秒").arg(intervalSeconds));
+           logTextEdit->append("[模式1] 开始监测检测区域变化，变化时将展示卡片区域截图");
+       }
+}
+// 新版OCR：仅检测红框（检测区域）变化，变化后展示绿框（卡片区域）[吴凯龙写]
+void MainWindow::newOCR()
+{
+    QScreen *screen = QGuiApplication::primaryScreen();
+    if (!screen) {
+        logTextEdit->append("<font color='orange'><b>[模式1] 无法获取屏幕！</b></font>");
+        return;
+    }
+
+    // 1. 截取整个屏幕
+    QPixmap pixmap = screen->grabWindow(0);
+    if (pixmap.isNull()) {
+        logTextEdit->append("<font color='orange'><b>[模式1] 截图失败！</b></font>");
+        return;
+    }
+
+    // 2. 转换为OpenCV Mat（BGR格式）
+    QImage image = pixmap.toImage().convertToFormat(QImage::Format_RGB888);
+    cv::Mat currentFrame(image.height(), image.width(), CV_8UC3, (uchar*)image.bits(), image.bytesPerLine());
+    cv::cvtColor(currentFrame, currentFrame, cv::COLOR_RGB2BGR);
+
+    // 3. 初始启动等待：确保首次计时完成后再检测变化
+    if (!isMonitoringActive) {
+        int elapsedSeconds = monitoringStartTime.secsTo(QDateTime::currentDateTime());
+        QSettings settings("MyCompany", "MonitorApp");
+        int intervalSeconds = settings.value("detectionInterval", 5).toInt();
+        if (elapsedSeconds >= intervalSeconds) {
+            isMonitoringActive = true;
+            // 首次启动时初始化红框区域的基准帧
+            int detectStartX = settings.value("detectStartX").toInt();
+            int detectWidth = settings.value("detectWidth").toInt();
+            int detectStartY = settings.value("detectStartY").toInt();
+            int detectHeight = settings.value("detectHeight").toInt();
+            m_croppedLastFrame = cropImageByPercent(currentFrame, detectStartX, detectWidth, detectStartY, detectHeight);
+
+            logTextEdit->append("[模式1] 首次计时完成，开始检测红框区域变化...");
+        } else {
+            return;
+        }
+    }
+
+    try {
+        // 4. 读取配置：红框（检测区域）参数 + 绿框（卡片区域）参数
+        QSettings settings("MyCompany", "MonitorApp");
+        // 红框：检测区域参数（和模式2完全一致）
+        int detectStartX = settings.value("detectStartX").toInt();
+        int detectWidth = settings.value("detectWidth").toInt();
+        int detectStartY = settings.value("detectStartY").toInt();
+        int detectHeight = settings.value("detectHeight").toInt();
+        // 绿框：卡片区域参数
+        int cardStartX = settings.value("cardStartX").toInt();
+        int cardWidth = settings.value("cardWidth").toInt();
+        int cardStartY = settings.value("cardStartY").toInt();
+        int cardHeight = settings.value("cardHeight").toInt();
+
+        // 5. 核心：借鉴模式2逻辑，仅检测红框（检测区域）的变化
+        // 5.1 裁剪当前帧的红框区域
+        cv::Mat croppedFrame = cropImageByPercent(currentFrame, detectStartX, detectWidth, detectStartY, detectHeight);
+        if (croppedFrame.empty()) {
+            logTextEdit->append("<font color='orange'><b>[模式1] 红框检测区域裁剪失败！</b></font>");
+            return;
+        }
+
+        // 5.2 对比红框区域的上一帧，计算变化比例（和模式2完全一致）
+        double changeRatio = 0.0;
+        if (!m_croppedLastFrame.empty()) {
+            // 计算两帧差异
+            cv::Mat diff;
+            cv::absdiff(m_croppedLastFrame, croppedFrame, diff);
+
+            // 转灰度→二值化→形态学去噪
+            cv::Mat grayDiff, binary;
+            cv::cvtColor(diff, grayDiff, cv::COLOR_BGR2GRAY);
+            cv::threshold(grayDiff, binary, 25, 255, cv::THRESH_BINARY);
+            cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+            cv::morphologyEx(binary, binary, cv::MORPH_OPEN, kernel);
+
+            // 计算红框区域变化比例
+            int changedPixels = cv::countNonZero(binary);
+            int totalPixels = binary.total();
+            changeRatio = totalPixels > 0 ? static_cast<double>(changedPixels) / totalPixels : 0.0;
+        }
+
+        // 5.3 判断红框区域是否变化（阈值0.3%，和模式2一致）
+        const double MIN_CHANGE_RATIO = 0.003;
+        if (changeRatio > MIN_CHANGE_RATIO) {
+            // 红框区域变化，触发绿框展示逻辑
+            logTextEdit->append(QString("<font color='red'><b>[模式1] 红框区域发现变化！变化比例: %1%</b></font>")
+                                .arg(changeRatio * 100, 0, 'f', 2));
+
+            // 6. 裁剪绿框（卡片区域）截图
+            cv::Mat cardFrame = cropImageByPercent(currentFrame, cardStartX, cardWidth, cardStartY, cardHeight);
+
+            // 7. 界面展示：
+            // ---- 7.1 原始截图（红框标记检测区 + 绿框标记卡片区）----
+            cv::Mat displayOriginal = currentFrame.clone();
+            // 画红框（检测区）
+            int redX = (displayOriginal.cols * detectStartX) / 100;
+            int redW = (displayOriginal.cols * detectWidth) / 100;
+            int redY = (displayOriginal.rows * detectStartY) / 100;
+            int redH = (displayOriginal.rows * detectHeight) / 100;
+            cv::rectangle(displayOriginal, cv::Point(redX, redY), cv::Point(redX+redW, redY+redH), cv::Scalar(0,0,255), 2);
+            // 画绿框（卡片区）
+            int greenX = (displayOriginal.cols * cardStartX) / 100;
+            int greenW = (displayOriginal.cols * cardWidth) / 100;
+            int greenY = (displayOriginal.rows * cardStartY) / 100;
+            int greenH = (displayOriginal.rows * cardHeight) / 100;
+            cv::rectangle(displayOriginal, cv::Point(greenX, greenY), cv::Point(greenX+greenW, greenY+greenH), cv::Scalar(0,255,0), 2);
+            // 格式转换展示
+            cv::cvtColor(displayOriginal, displayOriginal, cv::COLOR_BGR2RGB);
+            QImage img1((const uchar*)displayOriginal.data, displayOriginal.cols, displayOriginal.rows, displayOriginal.step, QImage::Format_RGB888);
+            imageLabel->setPixmap(QPixmap::fromImage(img1).scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+            // ---- 7.2 单独展示绿框（卡片区域）截图 ----
+            if (!cardFrame.empty()) {
+                cv::Mat displayCard = cardFrame.clone();
+                cv::cvtColor(displayCard, displayCard, cv::COLOR_BGR2RGB);
+                QImage img2((const uchar*)displayCard.data, displayCard.cols, displayCard.rows, displayCard.step, QImage::Format_RGB888);
+                croppedLabel->setPixmap(QPixmap::fromImage(img2).scaled(croppedLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+                croppedLabel->setText(""); // 清空提示
+            } else {
+                croppedLabel->setText("⚠️ 绿框卡片区域裁剪失败");
+            }
+
+            // 日志记录
+            logTextEdit->append(QString("[%1] [模式1] 红框区域变化触发 → 展示绿框卡片区域截图")
+                                .arg(QDateTime::currentDateTime().toString("HH:mm:ss")));
+        }
+
+        // 8. 更新红框区域的上一帧（而非全屏，保证检测精准，和模式2一致）
+        m_croppedLastFrame = croppedFrame.clone();
+
+    } catch (const cv::Exception& e) {
+        std::cerr << "❌ OpenCV Exception: " << e.what() << std::endl;
+        logTextEdit->append(QString("<font color='red'><b>[模式1] 异常：%1</b></font>").arg(e.what()));
+    } catch (...) {
+        std::cerr << "❌ Unknown Exception!" << std::endl;
+        logTextEdit->append("<font color='red'><b>[模式1] 未知异常！</b></font>");
+    }
 }

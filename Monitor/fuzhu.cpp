@@ -11,6 +11,8 @@
 #include <QGuiApplication>
 #include <cstring>
 #include <iostream>
+#include <QList>
+#include<QSettings>
 
 // 辅助函数：将cv::Mat转换为QImage（深拷贝，避免内存冲突）
 QImage matToQImage(const cv::Mat &mat)
@@ -47,10 +49,6 @@ fuzhu::fuzhu(QWidget *parent) :
     m_captureTimer = new QTimer(this);
     m_captureTimer->setInterval(100); // 增大间隔到100ms，降低性能压力
     m_screenSize = QSize(800, 600);   // 默认尺寸，避免后续计算错误
-    m_x1 = 20;
-    m_x2 = 80;
-    m_y1 = 20;
-    m_y2 = 80;
 
     // ========== 1. 初始化UI控件（手动添加，适配空ui文件） ==========
     // 创建中心窗口和主布局
@@ -69,9 +67,9 @@ fuzhu::fuzhu(QWidget *parent) :
     QWidget *sliderWidget = new QWidget(this);
     QVBoxLayout *sliderLayout = new QVBoxLayout(sliderWidget);
 
-    // x1滑块（左上角x百分比）
+    // x1滑块（左上角x百分比）- 标注检测区域
     QHBoxLayout *x1Layout = new QHBoxLayout;
-    QLabel *x1Label = new QLabel("X1 (左上角%):", this);
+    QLabel *x1Label = new QLabel("检测区域-X1 (左上角%):", this);
     QSlider *x1Slider = new QSlider(Qt::Horizontal, this);
     x1Slider->setRange(0, 100);
     x1Slider->setValue(m_x1);
@@ -79,9 +77,9 @@ fuzhu::fuzhu(QWidget *parent) :
     x1Layout->addWidget(x1Slider);
     sliderLayout->addLayout(x1Layout);
 
-    // x2滑块（右下角x百分比）
+    // x2滑块（右下角x百分比）- 标注检测区域
     QHBoxLayout *x2Layout = new QHBoxLayout;
-    QLabel *x2Label = new QLabel("X2 (右下角%):", this);
+    QLabel *x2Label = new QLabel("检测区域-X2 (右下角%):", this);
     QSlider *x2Slider = new QSlider(Qt::Horizontal, this);
     x2Slider->setRange(0, 100);
     x2Slider->setValue(m_x2);
@@ -89,9 +87,9 @@ fuzhu::fuzhu(QWidget *parent) :
     x2Layout->addWidget(x2Slider);
     sliderLayout->addLayout(x2Layout);
 
-    // y1滑块（左上角y百分比）
+    // y1滑块（左上角y百分比）- 标注检测区域
     QHBoxLayout *y1Layout = new QHBoxLayout;
-    QLabel *y1Label = new QLabel("Y1 (左上角%):", this);
+    QLabel *y1Label = new QLabel("检测区域-Y1 (左上角%):", this);
     QSlider *y1Slider = new QSlider(Qt::Horizontal, this);
     y1Slider->setRange(0, 100);
     y1Slider->setValue(m_y1);
@@ -99,9 +97,9 @@ fuzhu::fuzhu(QWidget *parent) :
     y1Layout->addWidget(y1Slider);
     sliderLayout->addLayout(y1Layout);
 
-    // y2滑块（右下角y百分比）
+    // y2滑块（右下角y百分比）- 标注检测区域
     QHBoxLayout *y2Layout = new QHBoxLayout;
-    QLabel *y2Label = new QLabel("Y2 (右下角%):", this);
+    QLabel *y2Label = new QLabel("检测区域-Y2 (右下角%):", this);
     QSlider *y2Slider = new QSlider(Qt::Horizontal, this);
     y2Slider->setRange(0, 100);
     y2Slider->setValue(m_y2);
@@ -111,8 +109,8 @@ fuzhu::fuzhu(QWidget *parent) :
 
     mainLayout->addWidget(sliderWidget);
 
-    // 1.3 确定按钮
-    QPushButton *confirmBtn = new QPushButton("确定", this);
+    // 1.3 确定按钮 - 初始文本为“确认检测区域”
+    QPushButton *confirmBtn = new QPushButton("确认检测区域", this);
     mainLayout->addWidget(confirmBtn, 0, Qt::AlignCenter);
 
     // ========== 2. 连接信号槽 ==========
@@ -120,10 +118,12 @@ fuzhu::fuzhu(QWidget *parent) :
     connect(m_captureTimer, &QTimer::timeout, this, [=]() {
         // 执行截屏
         captureScreenAndShow();
-        // 根据滑块值画框
-        onSliderValueChanged();
+        // 创建临时图像副本（避免画框叠加）
+        cv::Mat tempMat = m_screenMat.clone();
+        // 根据滑块值画框（分阶段画红/绿框）
+        onSliderValueChanged(tempMat);
         // 转换Mat为QImage并显示
-        QImage img = matToQImage(m_screenMat);
+        QImage img = matToQImage(tempMat);
         if (!img.isNull()) {
             imgLabel->setPixmap(QPixmap::fromImage(img).scaled(imgLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
         } else {
@@ -135,32 +135,40 @@ fuzhu::fuzhu(QWidget *parent) :
     // 滑块值变化时更新参数
     connect(x1Slider, &QSlider::valueChanged, this, [=](int value) {
         m_x1 = value;
-        onSliderValueChanged();
-        QImage img = matToQImage(m_screenMat);
+        // 刷新显示（重新画框）
+        cv::Mat tempMat = m_screenMat.clone();
+        onSliderValueChanged(tempMat);
+        QImage img = matToQImage(tempMat);
         if (!img.isNull()) {
             imgLabel->setPixmap(QPixmap::fromImage(img).scaled(imgLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
         }
     });
     connect(x2Slider, &QSlider::valueChanged, this, [=](int value) {
         m_x2 = value;
-        onSliderValueChanged();
-        QImage img = matToQImage(m_screenMat);
+        // 刷新显示（重新画框）
+        cv::Mat tempMat = m_screenMat.clone();
+        onSliderValueChanged(tempMat);
+        QImage img = matToQImage(tempMat);
         if (!img.isNull()) {
             imgLabel->setPixmap(QPixmap::fromImage(img).scaled(imgLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
         }
     });
     connect(y1Slider, &QSlider::valueChanged, this, [=](int value) {
         m_y1 = value;
-        onSliderValueChanged();
-        QImage img = matToQImage(m_screenMat);
+        // 刷新显示（重新画框）
+        cv::Mat tempMat = m_screenMat.clone();
+        onSliderValueChanged(tempMat);
+        QImage img = matToQImage(tempMat);
         if (!img.isNull()) {
             imgLabel->setPixmap(QPixmap::fromImage(img).scaled(imgLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
         }
     });
     connect(y2Slider, &QSlider::valueChanged, this, [=](int value) {
         m_y2 = value;
-        onSliderValueChanged();
-        QImage img = matToQImage(m_screenMat);
+        // 刷新显示（重新画框）
+        cv::Mat tempMat = m_screenMat.clone();
+        onSliderValueChanged(tempMat);
+        QImage img = matToQImage(tempMat);
         if (!img.isNull()) {
             imgLabel->setPixmap(QPixmap::fromImage(img).scaled(imgLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
         }
@@ -228,11 +236,11 @@ void fuzhu::captureScreenAndShow()
     m_screenSize = QSize(image.width(), image.height());
 }
 
-// ========== 滑块值变化：用OpenCV画框（添加空值保护） ==========
-void fuzhu::onSliderValueChanged()
+// ========== 滑块值变化：分阶段画红框（检测区）+ 绿框（卡片区） ==========
+void fuzhu::onSliderValueChanged(cv::Mat &drawMat)
 {
     // 空值保护：Mat为空或尺寸无效时直接返回
-    if (m_screenMat.empty() || m_screenSize.width() <= 0 || m_screenSize.height() <= 0) {
+    if (drawMat.empty() || m_screenSize.width() <= 0 || m_screenSize.height() <= 0) {
         return;
     }
 
@@ -242,17 +250,56 @@ void fuzhu::onSliderValueChanged()
     int y1 = qMin(m_y1, m_y2);
     int y2 = qMax(m_y1, m_y2);
 
-    // 计算实际像素坐标（根据屏幕尺寸的百分比）
+    // 计算当前滑块对应的像素坐标
     int px1 = (m_screenSize.width() * x1) / 100;
     int px2 = (m_screenSize.width() * x2) / 100;
     int py1 = (m_screenSize.height() * y1) / 100;
     int py2 = (m_screenSize.height() * y2) / 100;
 
-    // 用OpenCV画红色矩形（BGR格式：红=0,0,255）
-    cv::rectangle(m_screenMat, cv::Point(px1, py1), cv::Point(px2, py2), cv::Scalar(0, 0, 255), 2);
-}
+    // ========== 阶段1：选检测区域 → 仅画红色框（检测区） ==========
+    if (m_selectStage == 0) {
+        cv::rectangle(drawMat, cv::Point(px1, py1), cv::Point(px2, py2), cv::Scalar(0, 0, 255), 2);
+    }
+    // ========== 阶段2：选卡片区域 → 红框（保留检测区）+ 绿框（卡片区） ==========
+    else if (m_selectStage == 1) {
+        // 1. 先画红色框（检测区域，保留）
+        int detectPx1 = (m_screenSize.width() * m_detectStartX) / 100;
+        int detectPx2 = (m_screenSize.width() * (m_detectStartX + m_detectWidth)) / 100;
+        int detectPy1 = (m_screenSize.height() * m_detectStartY) / 100;
+        int detectPy2 = (m_screenSize.height() * (m_detectStartY + m_detectHeight)) / 100;
+        cv::rectangle(drawMat, cv::Point(detectPx1, detectPy1), cv::Point(detectPx2, detectPy2), cv::Scalar(0, 0, 255), 2);
 
-// ========== 确定按钮：计算并打印百分比 + 发射信号 + 关闭窗口 ==========
+        // 2. 再画绿色框（卡片区域，OpenCV绿色BGR：0,255,0）
+        cv::rectangle(drawMat, cv::Point(px1, py1), cv::Point(px2, py2), cv::Scalar(0, 255, 0), 2);
+    }
+}
+// 新增：保存区域配置（两步选择完成后调用）
+void fuzhu::saveAreaSettings()
+{
+    QSettings settings("MyCompany", "MonitorApp");
+
+    // 保存检测区域参数
+    settings.setValue("detectStartX", m_detectStartX);
+    settings.setValue("detectWidth", m_detectWidth);
+    settings.setValue("detectStartY", m_detectStartY);
+    settings.setValue("detectHeight", m_detectHeight);
+
+    // 保存卡片区域参数
+    settings.setValue("cardStartX", m_cardStartX);
+    settings.setValue("cardWidth", m_cardWidth);
+    settings.setValue("cardStartY", m_cardStartY);
+    settings.setValue("cardHeight", m_cardHeight);
+
+    // 保存滑块当前值（可选，恢复时滑块位置更精准）
+    settings.setValue("sliderX1", m_x1);
+    settings.setValue("sliderX2", m_x2);
+    settings.setValue("sliderY1", m_y1);
+    settings.setValue("sliderY2", m_y2);
+
+    settings.sync(); // 强制写入配置文件（避免缓存）
+    qDebug() << "配置保存完成：检测+卡片区域参数已写入";
+}
+// ========== 确定按钮：两步选择逻辑（检测区域→事件卡片区域） ==========
 void fuzhu::onConfirmButtonClicked()
 {
     // 确保x1 < x2，y1 < y2
@@ -262,32 +309,105 @@ void fuzhu::onConfirmButtonClicked()
     int y2 = qMax(m_y1, m_y2);
 
     // 计算区域占比
-    int startXPercent = x1;          // 左上角X起始占比
-    int widthPercent = x2 - x1;      // 宽度占X轴百分比
-    int startYPercent = y1;          // 左上角Y起始占比
-    int heightPercent = y2 - y1;     // 高度占Y轴百分比
-    double totalPercent = (widthPercent * heightPercent) / 100.0; // 总面积占比
+    int startXPercent = x1;
+    int widthPercent = x2 - x1;
+    int startYPercent = y1;
+    int heightPercent = y2 - y1;
+    double totalPercent = (widthPercent * heightPercent) / 100.0;
 
-    // 打印到控制台（qDebug + std::cout）
-    qDebug() << "---------- 区域占比信息 ----------";
-    qDebug() << "区域左上角X起始占屏幕X轴：" << startXPercent << "%";
-    qDebug() << "区域宽度占屏幕X轴：" << widthPercent << "%";
-    qDebug() << "区域左上角Y起始占屏幕Y轴：" << startYPercent << "%";
-    qDebug() << "区域高度占屏幕Y轴：" << heightPercent << "%";
-    qDebug() << "区域整体占屏幕：" << totalPercent << "%";
-    qDebug() << "----------------------------------";
+    // ========== 第一步：确认检测区域 ==========
+    if (m_selectStage == 0) {
+        // 保存检测区域参数
+        m_detectStartX = startXPercent;
+        m_detectWidth = widthPercent;
+        m_detectStartY = startYPercent;
+        m_detectHeight = heightPercent;
 
-    std::cout << "---------- 区域占比信息 ----------" << std::endl;
-    std::cout << "区域左上角X起始占屏幕X轴：" << startXPercent << "%" << std::endl;
-    std::cout << "区域宽度占屏幕X轴：" << widthPercent << "%" << std::endl;
-    std::cout << "区域左上角Y起始占屏幕Y轴：" << startYPercent << "%" << std::endl;
-    std::cout << "区域高度占屏幕Y轴：" << heightPercent << "%" << std::endl;
-    std::cout << "区域整体占屏幕：" << totalPercent << "%" << std::endl;
-    std::cout << "----------------------------------" << std::endl;
+        // 打印检测区域信息
+        qDebug() << "---------- 检测区域占比信息 ----------";
+        qDebug() << "检测区域左上角X起始占屏幕X轴：" << startXPercent << "%";
+        qDebug() << "检测区域宽度占屏幕X轴：" << widthPercent << "%";
+        qDebug() << "检测区域左上角Y起始占屏幕Y轴：" << startYPercent << "%";
+        qDebug() << "检测区域高度占屏幕Y轴：" << heightPercent << "%";
+        qDebug() << "检测区域整体占屏幕：" << totalPercent << "%";
+        qDebug() << "----------------------------------";
 
-    // ===== 1. 发射信号，传递参数给MainWindow =====
-    emit areaParamsConfirmed(startXPercent, widthPercent, startYPercent, heightPercent);
+        std::cout << "---------- 检测区域占比信息 ----------" << std::endl;
+        std::cout << "检测区域左上角X起始占屏幕X轴：" << startXPercent << "%" << std::endl;
+        std::cout << "检测区域宽度占屏幕X轴：" << widthPercent << "%" << std::endl;
+        std::cout << "检测区域左上角Y起始占屏幕Y轴：" << startYPercent << "%" << std::endl;
+        std::cout << "检测区域高度占屏幕Y轴：" << heightPercent << "%" << std::endl;
+        std::cout << "检测区域整体占屏幕：" << totalPercent << "%" << std::endl;
+        std::cout << "----------------------------------" << std::endl;
 
-    // ===== 2. 关闭fuzhu窗口 =====
-    this->close();
+        // 切换到第二步：选择事件卡片区域
+        m_selectStage = 1;
+        // 查找滑块标签并更新文本
+        QWidget *sliderWidget = this->findChild<QWidget*>();
+        if (sliderWidget) {
+            QList<QLabel*> labelList = sliderWidget->findChildren<QLabel*>();
+            if (labelList.size() >= 4) {
+                labelList[0]->setText("卡片区域-X1 (左上角%):");
+                labelList[1]->setText("卡片区域-X2 (右下角%):");
+                labelList[2]->setText("卡片区域-Y1 (左上角%):");
+                labelList[3]->setText("卡片区域-Y2 (右下角%):");
+            }
+            // 重置滑块值为检测区域内的默认值
+            m_x1 = m_detectStartX + 5;
+            m_x2 = m_detectStartX + m_detectWidth - 5;
+            m_y1 = m_detectStartY + 5;
+            m_y2 = m_detectStartY + m_detectHeight - 5;
+            // 同步滑块显示
+            QList<QSlider*> sliderList = sliderWidget->findChildren<QSlider*>();
+            if (sliderList.size() >= 4) {
+                sliderList[0]->setValue(m_x1);
+                sliderList[1]->setValue(m_x2);
+                sliderList[2]->setValue(m_y1);
+                sliderList[3]->setValue(m_y2);
+            }
+        }
+        // 更新确定按钮文本
+        QList<QPushButton*> btnList = this->findChildren<QPushButton*>();
+        if (!btnList.isEmpty()) {
+            btnList[0]->setText("确认事件卡片区域");
+        }
+
+    // ========== 第二步：确认事件卡片区域 ==========
+    } else if (m_selectStage == 1) {
+        // 保存事件卡片区域参数
+        m_cardStartX = startXPercent;
+        m_cardWidth = widthPercent;
+        m_cardStartY = startYPercent;
+        m_cardHeight = heightPercent;
+
+        // 打印卡片区域信息
+        qDebug() << "---------- 事件卡片区域占比信息 ----------";
+        qDebug() << "卡片区域左上角X起始占屏幕X轴：" << startXPercent << "%";
+        qDebug() << "卡片区域宽度占屏幕X轴：" << widthPercent << "%";
+        qDebug() << "卡片区域左上角Y起始占屏幕Y轴：" << startYPercent << "%";
+        qDebug() << "卡片区域高度占屏幕Y轴：" << heightPercent << "%";
+        qDebug() << "卡片区域整体占屏幕：" << totalPercent << "%";
+        qDebug() << "----------------------------------";
+
+        std::cout << "---------- 事件卡片区域占比信息 ----------" << std::endl;
+        std::cout << "卡片区域左上角X起始占屏幕X轴：" << startXPercent << "%" << std::endl;
+        std::cout << "卡片区域宽度占屏幕X轴：" << widthPercent << "%" << std::endl;
+        std::cout << "卡片区域左上角Y起始占屏幕Y轴：" << startYPercent << "%" << std::endl;
+        std::cout << "卡片区域高度占屏幕Y轴：" << heightPercent << "%" << std::endl;
+        std::cout << "卡片区域整体占屏幕：" << totalPercent << "%" << std::endl;
+        std::cout << "----------------------------------" << std::endl;
+
+        saveAreaSettings();
+
+        // ===== 发射信号：传递检测区域+卡片区域所有参数 =====
+        emit areaParamsConfirmed(
+            // 检测区域参数
+            m_detectStartX, m_detectWidth, m_detectStartY, m_detectHeight,
+            // 卡片区域参数
+            m_cardStartX, m_cardWidth, m_cardStartY, m_cardHeight
+        );
+
+        // 关闭窗口
+        this->close();
+    }
 }
