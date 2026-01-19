@@ -10,6 +10,7 @@
 #include "image.h"
 #include <QSettings>
 #include <QDebug>
+#include <QString>
 #include <QMessageBox>
 #include "fuzhu.h"
 
@@ -682,6 +683,15 @@ void MainWindow::newOCR()
             // 6. 裁剪绿框（卡片区域）截图
             cv::Mat cardFrame = cropImageByPercent(currentFrame, cardStartX, cardWidth, cardStartY, cardHeight);
 
+            //马浩宇看这里，这里进行OCR识别cardFrame就是要识别的区域，卡片区域；下面是测试类型和等级的获取
+            QString type = settings.value("eventType").toString();
+            std::cout << "监测类型：" << type.toStdString() << std::endl;
+            int level = settings.value("eventLevel").toInt();
+            std::cout << "监测等级：" << level << std::endl;
+            logTextEdit->append(QString("[%1] [模式1] 监测类型：%2，监测等级：%3")
+                                .arg(QDateTime::currentDateTime().toString("HH:mm:ss"))
+                                .arg(type)
+                                .arg(level));
             // 7. 界面展示：
             // ---- 7.1 原始截图（红框标记检测区 + 绿框标记卡片区）----
             cv::Mat displayOriginal = currentFrame.clone();

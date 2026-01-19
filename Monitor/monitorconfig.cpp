@@ -1,4 +1,3 @@
-// monitorconfig.cpp
 #include "monitorconfig.h"
 #include <QFileDialog>
 #include <QDir>
@@ -6,8 +5,6 @@
 #include <QHBoxLayout>
 #include <QFormLayout>
 #include <QLabel>
-#include <QListWidgetItem>
-#include <QAbstractItemView>
 #include <QDialogButtonBox>
 #include <QSettings>
 #include <QMessageBox>
@@ -15,7 +12,6 @@
 #include <QResource>
 #include <QFile>
 #include <QDebug>
-#include <QMenu>
 #include <windows.h>
 #include <mmsystem.h> // PlaySound 所需
 
@@ -31,7 +27,7 @@ MonitorConfig::MonitorConfig(QWidget *parent)
     setWindowTitle("设置");
     resize(400, 500);
 
-    // === 音频设置 ===
+    // === 音频设置（保留不变）===
     m_audioPathEdit = new QLineEdit(this);
     m_audioPathEdit->setReadOnly(true);
 
@@ -53,7 +49,7 @@ MonitorConfig::MonitorConfig(QWidget *parent)
     audioLayout->addWidget(m_audioPathEdit);
     audioGroup->setLayout(audioLayout);
 
-    // === 播放设置 ===
+    // === 播放设置（保留不变）===
     m_radioOnce = new QRadioButton("播放 1 次", this);
     m_radioInfinite = new QRadioButton("无限循环", this);
     m_radioCustom = new QRadioButton("自定义次数：", this);
@@ -77,28 +73,27 @@ MonitorConfig::MonitorConfig(QWidget *parent)
 
     m_radioOnce->setChecked(true);
 
-    // === 关键词监控 ===
-    m_keywordInput = new QLineEdit(this);
-    m_addKeywordButton = new QPushButton("添加", this);
-    connect(m_addKeywordButton, &QPushButton::clicked, this, &MonitorConfig::on_addKeywordButton_clicked);
-    connect(m_keywordInput, &QLineEdit::returnPressed, this, &MonitorConfig::on_addKeywordButton_clicked);
+    // === 替换关键词监控为：事件类型+等级监测 ===
+    // 事件类型下拉框（固定选项：火灾、社会救助，默认选中火灾）
+    m_eventTypeCombo = new QComboBox(this);
+    m_eventTypeCombo->addItem("火灾");
+    m_eventTypeCombo->addItem("社会救助");
+    m_eventTypeCombo->setCurrentIndex(0); // 默认选中火灾
 
-    m_keywordList = new QListWidget(this);
-    m_keywordList->setSelectionMode(QAbstractItemView::NoSelection);
-    m_keywordList->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(m_keywordList, &QListWidget::customContextMenuRequested,
-            this, &MonitorConfig::on_keywordList_customContextMenuRequested);
+    // 等级选择（1-4级，默认1级）
+    m_eventLevelSpin = new QSpinBox(this);
+    m_eventLevelSpin->setRange(1, 10);
+    m_eventLevelSpin->setValue(1); // 默认1级
+    m_eventLevelSpin->setSuffix(" 级");
 
-    QGroupBox *keywordGroup = new QGroupBox("关键词监控", this);
-    QVBoxLayout *keywordLayout = new QVBoxLayout;
-    QHBoxLayout *inputLayout = new QHBoxLayout;
-    inputLayout->addWidget(m_keywordInput);
-    inputLayout->addWidget(m_addKeywordButton);
-    keywordLayout->addLayout(inputLayout);
-    keywordLayout->addWidget(m_keywordList);
-    keywordGroup->setLayout(keywordLayout);
+    // 布局：事件类型 + 等级
+    QGroupBox *eventGroup = new QGroupBox("事件监测设置", this);
+    QFormLayout *eventLayout = new QFormLayout;
+    eventLayout->addRow("事件类型：", m_eventTypeCombo);
+    eventLayout->addRow("事件等级：", m_eventLevelSpin);
+    eventGroup->setLayout(eventLayout);
 
-    // === 屏幕检测间隔设置 ===
+    // === 屏幕检测间隔设置（保留不变）===
     m_intervalSpin = new QSpinBox(this);
     m_intervalSpin->setRange(1, 3600);
     m_intervalSpin->setValue(5);
@@ -112,7 +107,7 @@ MonitorConfig::MonitorConfig(QWidget *parent)
     intervalLayout->addStretch();
     intervalGroup->setLayout(intervalLayout);
 
-    // === 主题设置 ===
+    // === 主题设置（保留不变）===
     m_radioLight = new QRadioButton("明亮模式", this);
     m_radioDark = new QRadioButton("黑暗模式", this);
     m_radioLight->setChecked(true);
@@ -123,7 +118,7 @@ MonitorConfig::MonitorConfig(QWidget *parent)
     themeLayout->addWidget(m_radioDark);
     themeGroup->setLayout(themeLayout);
 
-    // === 底部按钮 ===
+    // === 底部按钮（保留不变）===
     m_playAudioButton = new QPushButton("播放音频", this);
     m_shutAudioButton = new QPushButton("停止播放", this);
     QPushButton *okButton = new QPushButton("确定", this);
@@ -135,14 +130,14 @@ MonitorConfig::MonitorConfig(QWidget *parent)
     connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
     connect(this, &QDialog::accepted, this, &MonitorConfig::saveSettings);
 
-    // 循环播放定时器
+    // 循环播放定时器（保留）
     connect(m_loopTimer, &QTimer::timeout, this, &MonitorConfig::onLoopTimerTimeout);
 
-    // === 主布局 ===
+    // === 主布局（调整：替换关键词GroupBox为事件GroupBox）===
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->addWidget(audioGroup);
     mainLayout->addWidget(playGroup);
-    mainLayout->addWidget(keywordGroup);
+    mainLayout->addWidget(eventGroup); // 新增事件监测布局
     mainLayout->addWidget(intervalGroup);
     mainLayout->addWidget(themeGroup);
     mainLayout->addStretch();
@@ -169,8 +164,7 @@ MonitorConfig::~MonitorConfig()
     }
 }
 
-// ===== 槽函数 =====
-
+// ===== 槽函数（移除关键词相关，保留其他）=====
 void MonitorConfig::on_audioSourceCombo_changed(int index)
 {
     if (index == 0) {
@@ -195,29 +189,23 @@ void MonitorConfig::on_selectAudioButton_clicked()
     }
 }
 
-void MonitorConfig::on_addKeywordButton_clicked()
-{
-    QString keyword = m_keywordInput->text().trimmed();
-    if (keyword.isEmpty()) return;
-
-    for (int i = 0; i < m_keywordList->count(); ++i) {
-        if (m_keywordList->item(i)->text() == keyword)
-            return;
-    }
-
-    QListWidgetItem *item = new QListWidgetItem(keyword, m_keywordList);
-    item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-    item->setCheckState(Qt::Checked);
-    m_keywordInput->clear();
-}
-
 void MonitorConfig::on_radioCustom_toggled(bool checked)
 {
     m_spinCustom->setEnabled(checked);
 }
 
-// ===== 获取配置 =====
+// ===== 新增：获取事件类型和等级 =====
+QString MonitorConfig::eventType() const
+{
+    return m_eventTypeCombo->currentText();
+}
 
+int MonitorConfig::eventLevel() const
+{
+    return m_eventLevelSpin->value();
+}
+
+// ===== 原有音频相关逻辑（保留不变）=====
 QString MonitorConfig::audioFilePath() const
 {
     int index = m_audioSourceCombo->currentIndex();
@@ -239,18 +227,6 @@ int MonitorConfig::loopCount() const
     }
 }
 
-QStringList MonitorConfig::checkedKeywords() const
-{
-    QStringList list;
-    for (int i = 0; i < m_keywordList->count(); ++i) {
-        auto item = m_keywordList->item(i);
-        if (item->checkState() == Qt::Checked) {
-            list << item->text();
-        }
-    }
-    return list;
-}
-
 bool MonitorConfig::isDarkMode() const
 {
     return m_radioDark->isChecked();
@@ -260,8 +236,6 @@ int MonitorConfig::detectionIntervalSeconds() const
 {
     return m_intervalSpin->value();
 }
-
-// ===== 音频播放逻辑（使用 PlaySound）=====
 
 QString MonitorConfig::extractBuiltInAudioToTemp()
 {
@@ -383,29 +357,12 @@ void MonitorConfig::on_shutAudioButton_clicked()
     stopAlertSound();
 }
 
-// ===== 右键菜单 =====
-
-void MonitorConfig::on_keywordList_customContextMenuRequested(const QPoint &pos)
-{
-    QListWidgetItem *item = m_keywordList->itemAt(pos);
-    if (!item) return;
-
-    QMenu menu(this);
-    QAction *deleteAction = menu.addAction("删除关键词");
-
-    QAction *selectedAction = menu.exec(m_keywordList->mapToGlobal(pos));
-    if (selectedAction == deleteAction) {
-        int row = m_keywordList->row(item);
-        delete m_keywordList->takeItem(row);
-    }
-}
-
-// ===== 设置保存/加载 =====
-
+// ===== 设置保存/加载（修改：保存事件类型和等级，移除关键词）=====
 void MonitorConfig::loadSettings()
 {
     QSettings settings("MyCompany", "MonitorApp");
 
+    // 音频设置（保留）
     int audioIndex = settings.value("audioSourceIndex", 0).toInt();
     m_audioSourceCombo->setCurrentIndex(audioIndex);
     on_audioSourceCombo_changed(audioIndex);
@@ -415,6 +372,7 @@ void MonitorConfig::loadSettings()
         m_audioPathEdit->setText(localPath);
     }
 
+    // 播放设置（保留）
     bool isOnce = settings.value("playOnce", true).toBool();
     bool isInfinite = settings.value("playInfinite", false).toBool();
     int customCount = settings.value("customCount", 3).toInt();
@@ -428,16 +386,21 @@ void MonitorConfig::loadSettings()
         m_spinCustom->setValue(customCount);
     }
 
-    QStringList keywords = settings.value("keywords").toStringList();
-    for (const QString &kw : keywords) {
-        QListWidgetItem *item = new QListWidgetItem(kw, m_keywordList);
-        item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-        item->setCheckState(Qt::Checked);
+    // 新增：加载事件类型和等级（默认火灾、1级）
+    QString eventType = settings.value("eventType", "火灾").toString();
+    int eventLevel = settings.value("eventLevel", 1).toInt();
+    // 匹配事件类型下拉框索引
+    int eventIndex = m_eventTypeCombo->findText(eventType);
+    if (eventIndex != -1) {
+        m_eventTypeCombo->setCurrentIndex(eventIndex);
     }
+    m_eventLevelSpin->setValue(eventLevel);
 
+    // 主题设置（保留）
     bool isDark = settings.value("darkMode", false).toBool();
     m_radioDark->setChecked(isDark);
 
+    // 检测间隔（保留）
     int interval = settings.value("detectionInterval", 5).toInt();
     m_intervalSpin->setValue(interval);
 }
@@ -446,19 +409,18 @@ void MonitorConfig::saveSettings()
 {
     QSettings settings("MyCompany", "MonitorApp");
 
+    // 音频设置（保留）
     settings.setValue("audioSourceIndex", m_audioSourceCombo->currentIndex());
     settings.setValue("localAudioPath", m_audioPathEdit->text());
     settings.setValue("playOnce", m_radioOnce->isChecked());
     settings.setValue("playInfinite", m_radioInfinite->isChecked());
     settings.setValue("customCount", m_spinCustom->value());
 
-    QStringList keywords;
-    for (int i = 0; i < m_keywordList->count(); ++i) {
-        if (m_keywordList->item(i)->checkState() == Qt::Checked) {
-            keywords << m_keywordList->item(i)->text();
-        }
-    }
-    settings.setValue("keywords", keywords);
+    // 新增：保存事件类型和等级
+    settings.setValue("eventType", m_eventTypeCombo->currentText());
+    settings.setValue("eventLevel", m_eventLevelSpin->value());
+
+    // 保留其他设置
     settings.setValue("detectionInterval", m_intervalSpin->value());
     settings.setValue("darkMode", m_radioDark->isChecked());
 }
