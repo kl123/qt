@@ -685,18 +685,36 @@ void MainWindow::newOCR()
 
             QString type = settings.value("eventType").toString();
             std::cout << "监测类型：" << type.toStdString() << std::endl;
-            int level = settings.value("eventLevel").toInt();
-            std::cout << "监测等级：" << level << std::endl;
-            logTextEdit->append(QString("[%1] [模式1] 监测类型：%2，监测等级：%3")
+            logTextEdit->append(QString("[%1] [模式1] 监测类型：%2")
                                 .arg(QDateTime::currentDateTime().toString("HH:mm:ss"))
-                                .arg(type)
-                                .arg(level));
+                                .arg(type));
 
             if (!cardFrame.empty()) {
                 OcrHelper ocrHelper;
                 const QString cardText = ocrHelper.recognizeText(cardFrame);
                 logTextEdit->append(QString("[%1] [模式1] OCR：").arg(QDateTime::currentDateTime().toString("HH:mm:ss")));
                 logTextEdit->append(cardText.isEmpty() ? QStringLiteral("(空)") : cardText);
+
+                const QString trimmedType = type.trimmed();
+                if (!trimmedType.isEmpty() && !cardText.isEmpty()) {
+                    QString compactType = trimmedType;
+                    compactType.remove(' ');
+                    compactType.remove('\n');
+                    compactType.remove('\r');
+                    compactType.remove('\t');
+
+                    QString compactText = cardText;
+                    compactText.remove(' ');
+                    compactText.remove('\n');
+                    compactText.remove('\r');
+                    compactText.remove('\t');
+
+                    if (!compactType.isEmpty() && compactText.contains(compactType, Qt::CaseInsensitive)) {
+                        logTextEdit->append(QString("<font color='red'><b>[报警触发] 识别文本命中监测类型：%1</b></font>")
+                                            .arg(type));
+                        m_imageProcessor.StartAlert();
+                    }
+                }
 
                 const QStringList lines = cardText.split('\n', Qt::SkipEmptyParts);
                 if (!lines.isEmpty()) {
