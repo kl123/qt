@@ -1,0 +1,68 @@
+# Qt Creator / Qt tools (user-specific or generated)
+*.pro.user*
+*.qbs.user*
+*.qmlproject.user*
+*.qtc_clangd/
+.qtc_clangd/
+.qmake.stash
+*.autosave
+.qtcreator/
+
+# qmake / Qt generated sources
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+
+# Common build output folders
+build*/
+Build*/
+**/build*/
+**/Build*/
+debug/
+release/
+**/debug/
+**/release/
+
+# CMake (if used)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+
+# qmake Makefiles (usually generated)
+Makefile
+Makefile.*
+**/Makefile
+**/Makefile.*
+
+# MSVC / Windows build artifacts
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.ipdb
+*.iobj
+*.tlog
+*.pch
+*.aps
+*.res
+*.suo
+*.user
+*.user.*
+*.VC.db
+*.VC.VC.opendb
+
+# MinGW / GCC build artifacts
+*.o
+*.d
+*.dSYM/
+
+# Logs / temp
+*.log
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+Monitor/.qtcreator/Monitor.pro.user
+Monitor/Monitor_resource.rc
