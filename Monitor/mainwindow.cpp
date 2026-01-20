@@ -683,7 +683,6 @@ void MainWindow::newOCR()
             // 6. 裁剪绿框（卡片区域）截图
             cv::Mat cardFrame = cropImageByPercent(currentFrame, cardStartX, cardWidth, cardStartY, cardHeight);
 
-            //马浩宇看这里，这里进行OCR识别cardFrame就是要识别的区域，卡片区域；下面是测试类型和等级的获取
             QString type = settings.value("eventType").toString();
             std::cout << "监测类型：" << type.toStdString() << std::endl;
             int level = settings.value("eventLevel").toInt();
@@ -692,6 +691,25 @@ void MainWindow::newOCR()
                                 .arg(QDateTime::currentDateTime().toString("HH:mm:ss"))
                                 .arg(type)
                                 .arg(level));
+
+            if (!cardFrame.empty()) {
+                OcrHelper ocrHelper;
+                const QString cardText = ocrHelper.recognizeText(cardFrame);
+                logTextEdit->append(QString("[%1] [模式1] OCR：").arg(QDateTime::currentDateTime().toString("HH:mm:ss")));
+                logTextEdit->append(cardText.isEmpty() ? QStringLiteral("(空)") : cardText);
+
+                const QStringList lines = cardText.split('\n', Qt::SkipEmptyParts);
+                if (!lines.isEmpty()) {
+                    const QString latestLine = lines.last().trimmed();
+                    ChatMessage chatMsg;
+                    chatMsg.timestamp = QDateTime::currentDateTime();
+                    chatMsg.content = latestLine;
+                    m_chatHistory.push_back(chatMsg);
+                    if (m_chatHistory.size() > 100) {
+                        m_chatHistory.pop_front();
+                    }
+                }
+            }
             // 7. 界面展示：
             // ---- 7.1 原始截图（红框标记检测区 + 绿框标记卡片区）----
             cv::Mat displayOriginal = currentFrame.clone();
