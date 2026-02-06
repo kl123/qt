@@ -15,7 +15,7 @@ win32 {
     }
 }
 
-QT       += core gui
+QT       += core gui sql
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 CONFIG += c++17
 
@@ -29,6 +29,7 @@ SOURCES += \
     mainwindow.cpp \
     monitorconfig.cpp \
     ocrhelper.cpp \
+    userauth.cpp \
     third_party/RapidOcrOnnx/src/AngleNet.cpp \
     third_party/RapidOcrOnnx/src/CrnnNet.cpp \
     third_party/RapidOcrOnnx/src/DbNet.cpp \
@@ -43,7 +44,8 @@ HEADERS += \
     image.h \
     mainwindow.h \
     monitorconfig.h \
-    ocrhelper.h
+    ocrhelper.h \
+    userauth.h
 
 FORMS += \
     fuzhu.ui \
