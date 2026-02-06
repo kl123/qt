@@ -1,0 +1,12 @@
+debug/fuzhu.o
+debug/home.o
+debug/image.o
+debug/main.o
+debug/mainwindow.o
+debug/monitorconfig.o
+debug/ocrhelper.o
+debug/qrc_audio.o
+debug/moc_fuzhu.o
+debug/moc_home.o
+debug/moc_mainwindow.o
+debug/moc_monitorconfig.o

@@ -6,6 +6,7 @@ DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000
 
 SOURCES += \
     fuzhu.cpp \
+    home.cpp \
     image.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -14,6 +15,7 @@ SOURCES += \
 
 HEADERS += \
     fuzhu.h \
+    home.h \
     image.h \
     mainwindow.h \
     monitorconfig.h \
@@ -21,10 +23,12 @@ HEADERS += \
 
 FORMS += \
     fuzhu.ui \
+    home.ui \
     mainwindow.ui \
     monitorconfig.ui
 
 QT += multimedia
+QT += charts
 
 # === OpenCV 设置 ===
 OPENCV_DIR = $$PWD/asset/openCV-minGW

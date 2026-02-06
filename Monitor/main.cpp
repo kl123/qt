@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "home.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <exception>
@@ -25,8 +26,10 @@ int main(int argc, char *argv[])
 
     // 捕获C++异常，避免程序直接崩溃
     try {
-        MainWindow w;
-        w.show();
+        Home h;
+        h.show();
+//        MainWindow w;
+//        w.show();
         return a.exec();
     } catch (const std::exception &e) {
         std::cerr << "C++ Exception: " << e.what() << std::endl;

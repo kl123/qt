@@ -1,0 +1,12 @@
+release/fuzhu.o
+release/home.o
+release/image.o
+release/main.o
+release/mainwindow.o
+release/monitorconfig.o
+release/ocrhelper.o
+release/qrc_audio.o
+release/moc_fuzhu.o
+release/moc_home.o
+release/moc_mainwindow.o
+release/moc_monitorconfig.o
