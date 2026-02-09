@@ -19,7 +19,6 @@
 #include "userauth.h"
 #include <QList>
 
-
 class Login : public QDialog
 {
     Q_OBJECT
