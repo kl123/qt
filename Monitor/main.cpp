@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "login.h"
 #include "ocrhelper.h"
 #include <QApplication>
 #include <QCoreApplication>
@@ -300,8 +301,10 @@ int main(int argc, char *argv[])
 
     // 捕获C++异常，避免程序直接崩溃
     try {
-        MainWindow w;
-        w.show();
+//        MainWindow w;
+//        w.show();
+        Login l;
+        l.show();
         return a.exec();
     } catch (const std::exception &e) {
         std::cerr << "C++ Exception: " << e.what() << std::endl;

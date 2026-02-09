@@ -4,6 +4,15 @@ debug/main.o
 debug/mainwindow.o
 debug/monitorconfig.o
 debug/ocrhelper.o
+debug/userauth.o
+debug/AngleNet.o
+debug/CrnnNet.o
+debug/DbNet.o
+debug/OcrLite.o
+debug/OcrLiteImpl.o
+debug/OcrResultUtils.o
+debug/OcrUtils.o
+debug/clipper.o
 debug/qrc_audio.o
 debug/moc_fuzhu.o
 debug/moc_mainwindow.o

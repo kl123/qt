@@ -25,6 +25,7 @@ DEFINES += _Frees_ptr_opt_=
 SOURCES += \
     fuzhu.cpp \
     image.cpp \
+    login.cpp \
     main.cpp \
     mainwindow.cpp \
     monitorconfig.cpp \
@@ -42,6 +43,7 @@ SOURCES += \
 HEADERS += \
     fuzhu.h \
     image.h \
+    login.h \
     mainwindow.h \
     monitorconfig.h \
     ocrhelper.h \
@@ -49,6 +51,7 @@ HEADERS += \
 
 FORMS += \
     fuzhu.ui \
+    login.ui \
     mainwindow.ui \
     monitorconfig.ui
 

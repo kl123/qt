@@ -186,7 +186,7 @@ QString err;
 bool ok = UserAuth::searchDispatchersByUnit(unitId, "disp", 20, &dispatchers, &err);
 ```
 
-选择一个 `dispatcherUserId`，注册现场处置员并绑定：
+选择一个 `dispatcherUserId`，注册现场处置员并绑定：a
 
 ```cpp
 qint64 handlerId = 0;

@@ -4,5 +4,6 @@
         <file>monitor.ico</file>
         <file>alert2.wav</file>
         <file>logo.jpg</file>
+        <file>login.jpg</file>
     </qresource>
 </RCC>
