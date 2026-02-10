@@ -198,7 +198,7 @@ static bool insertUser(
     qint64 unitId,
     const QString& unitName,
     qint64 dispatcherUserId,
-    qint64* outUserId,
+    qint64* userId,
     QString* errorMessage)
 {
     bool hasUnitIdColumn = false;
@@ -254,13 +254,13 @@ static bool insertUser(
         return false;
     }
 
-    if (outUserId) {
-        *outUserId = query.lastInsertId().toLongLong();
+    if (userId) {
+        *userId = query.lastInsertId().toLongLong();
     }
     return true;
 }
 
-bool UserAuth::createUnit(const QString& unitName, qint64* outUnitId, QString* errorMessage)
+bool UserAuth::createUnit(const QString& unitName, qint64* unitId, QString* errorMessage)
 {
     if (unitName.trimmed().isEmpty()) {
         if (errorMessage) {
@@ -301,13 +301,13 @@ bool UserAuth::createUnit(const QString& unitName, qint64* outUnitId, QString* e
         return false;
     }
 
-    if (outUnitId) {
-        *outUnitId = query.lastInsertId().toLongLong();
+    if (unitId) {
+        *unitId = query.lastInsertId().toLongLong();
     }
     return true;
 }
 
-bool UserAuth::searchUnits(const QString& keyword, int limit, QList<UnitInfo>* outUnits, QString* errorMessage)
+bool UserAuth::searchUnits(const QString& keyword, int limit, QList<UnitInfo>* units, QString* errorMessage)
 {
     if (limit <= 0) {
         limit = 20;
@@ -333,8 +333,8 @@ bool UserAuth::searchUnits(const QString& keyword, int limit, QList<UnitInfo>* o
         return false;
     }
 
-    if (outUnits) {
-        outUnits->clear();
+    if (units) {
+        units->clear();
     }
 
     QSqlQuery query(db);
@@ -349,12 +349,12 @@ bool UserAuth::searchUnits(const QString& keyword, int limit, QList<UnitInfo>* o
         return false;
     }
 
-    if (outUnits) {
+    if (units) {
         while (query.next()) {
             UnitInfo info;
             info.id = query.value(0).toLongLong();
             info.name = query.value(1).toString();
-            outUnits->push_back(info);
+            units->push_back(info);
         }
     }
 
@@ -365,7 +365,7 @@ bool UserAuth::searchDispatchersByUnit(
     qint64 unitId,
     const QString& keyword,
     int limit,
-    QList<DispatcherInfo>* outDispatchers,
+    QList<DispatcherInfo>* dispatchers,
     QString* errorMessage)
 {
     if (unitId <= 0) {
@@ -398,8 +398,8 @@ bool UserAuth::searchDispatchersByUnit(
         return false;
     }
 
-    if (outDispatchers) {
-        outDispatchers->clear();
+    if (dispatchers) {
+        dispatchers->clear();
     }
 
     QSqlQuery query(db);
@@ -425,14 +425,14 @@ bool UserAuth::searchDispatchersByUnit(
         return false;
     }
 
-    if (outDispatchers) {
+    if (dispatchers) {
         while (query.next()) {
             DispatcherInfo info;
             info.id = query.value(0).toLongLong();
             info.username = query.value(1).toString();
             info.phone = query.value(2).toString();
             info.unit = query.value(3).toString();
-            outDispatchers->push_back(info);
+            dispatchers->push_back(info);
         }
     }
     return true;
@@ -444,7 +444,7 @@ bool UserAuth::registerUser(
     const QString& phone,
     const QString& role,
     const QString& unit,
-    qint64* outUserId,
+    qint64* userId,
     QString* errorMessage)
 {
     if (isDispatcherRole(role)) {
@@ -477,7 +477,7 @@ bool UserAuth::registerUser(
             }
             return false;
         }
-        return registerDispatcherWithUnitId(username, password, phone, role, unitId, outUserId, errorMessage);
+        return registerDispatcherWithUnitId(username, password, phone, role, unitId, userId, errorMessage);
     }
 
     if (isHandlerRole(role)) {
@@ -487,7 +487,7 @@ bool UserAuth::registerUser(
         return false;
     }
 
-    return registerUserWithUnitId(username, password, phone, role, 0, outUserId, errorMessage);
+    return registerUserWithUnitId(username, password, phone, role, 0, userId, errorMessage);
 }
 
 bool UserAuth::registerDispatcherWithUnitId(
@@ -496,7 +496,7 @@ bool UserAuth::registerDispatcherWithUnitId(
     const QString& phone,
     const QString& role,
     qint64 unitId,
-    qint64* outUserId,
+    qint64* userId,
     QString* errorMessage)
 {
     if (!isDispatcherRole(role)) {
@@ -505,7 +505,7 @@ bool UserAuth::registerDispatcherWithUnitId(
         }
         return false;
     }
-    return registerUserWithUnitId(username, password, phone, role, unitId, outUserId, errorMessage);
+    return registerUserWithUnitId(username, password, phone, role, unitId, userId, errorMessage);
 }
 
 bool UserAuth::registerHandlerWithDispatcherId(
@@ -513,7 +513,7 @@ bool UserAuth::registerHandlerWithDispatcherId(
     const QString& password,
     const QString& phone,
     qint64 dispatcherUserId,
-    qint64* outUserId,
+    qint64* userId,
     QString* errorMessage)
 {
     if (dispatcherUserId <= 0) {
@@ -583,7 +583,7 @@ bool UserAuth::registerHandlerWithDispatcherId(
         return false;
     }
 
-    return insertUser(db, username, password, phone, QStringLiteral("现场处置员"), unitId, unitName, dispatcherUserId, outUserId, errorMessage);
+    return insertUser(db, username, password, phone, QStringLiteral("现场处置员"), unitId, unitName, dispatcherUserId, userId, errorMessage);
 }
 
 bool UserAuth::registerUserWithUnitId(
@@ -592,7 +592,7 @@ bool UserAuth::registerUserWithUnitId(
     const QString& phone,
     const QString& role,
     qint64 unitId,
-    qint64* outUserId,
+    qint64* userId,
     QString* errorMessage)
 {
     if (username.trimmed().isEmpty()) {
@@ -652,13 +652,13 @@ bool UserAuth::registerUserWithUnitId(
         unitName = lookup.value(0).toString();
     }
 
-    return insertUser(db, username, password, phone, role, unitId, unitName, 0, outUserId, errorMessage);
+    return insertUser(db, username, password, phone, role, unitId, unitName, 0, userId, errorMessage);
 }
 
 bool UserAuth::login(
     const QString& username,
     const QString& password,
-    AuthUser* outUser,
+    AuthUser* user,
     QString* errorMessage)
 {
     if (username.trimmed().isEmpty()) {
@@ -729,13 +729,13 @@ bool UserAuth::login(
         return false;
     }
 
-    if (outUser) {
-        outUser->id = id;
-        outUser->username = dbUsername;
-        outUser->phone = dbPhone;
-        outUser->role = dbRole;
-        outUser->unit = dbUnit;
-        outUser->dispatcherUserId = dispatcherUserId;
+    if (user) {
+        user->id = id;
+        user->username = dbUsername;
+        user->phone = dbPhone;
+        user->role = dbRole;
+        user->unit = dbUnit;
+        user->dispatcherUserId = dispatcherUserId;
     }
 
     return true;

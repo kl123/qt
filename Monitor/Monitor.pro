@@ -25,6 +25,7 @@ DEFINES += _Frees_ptr_opt_=
 SOURCES += \
     fuzhu.cpp \
     image.cpp \
+    disasterdao.cpp \
     login.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -41,6 +42,7 @@ SOURCES += \
     third_party/RapidOcrOnnx/src/clipper.cpp
 
 HEADERS += \
+    disasterdao.h \
     fuzhu.h \
     image.h \
     login.h \

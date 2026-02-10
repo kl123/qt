@@ -1,5 +1,6 @@
 debug/fuzhu.o
 debug/image.o
+debug/disasterdao.o
 debug/login.o
 debug/main.o
 debug/mainwindow.o

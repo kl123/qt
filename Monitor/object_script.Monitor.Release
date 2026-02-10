@@ -1,5 +1,6 @@
 release/fuzhu.o
 release/image.o
+release/disasterdao.o
 release/login.o
 release/main.o
 release/mainwindow.o
