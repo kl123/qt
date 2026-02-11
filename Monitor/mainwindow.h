@@ -86,6 +86,11 @@ private:
     int m_areaStartY = 0;
     int m_areaHeight = 100;
     cv::Mat m_croppedLastFrame;
+
+    // 新增：保存上一次的OCR文本（用于对比新增文字）
+    QString m_lastOcrText;
+    // 辅助函数：提取新增文字
+    QString extractNewText(const QString& oldText, const QString& newText);
 };
 
 #endif // MAINWINDOW_H

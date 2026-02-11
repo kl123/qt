@@ -13,6 +13,7 @@
 #include <QString>
 #include <QMessageBox>
 #include "fuzhu.h"
+#include "disasterdao.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -497,54 +498,26 @@ void MainWindow::onContinuousCapture()
 }
 void MainWindow::mode2()
 {
-    // 1. 先停止当前可能正在运行的连续检测（避免重复启动）
-    if (isContinuousDetecting) {
-        stopAllMonitoring();
-        return;
+    DisasterQuery q;
+    q.severityMin = 0;
+    q.orderBy = DisasterQuery::OrderBy::SeverityDesc;
+
+    QList<DisasterRecord> records;
+    QString err;
+    // 注意：传入 &records 接收查询结果
+    if (DisasterDao::queryDisasters(q, &records, &err)) {
+        qDebug() << "查询成功，找到" << records.size() << "条记录";
+        for (const auto& record : records) {
+            qDebug() << "ID:" << record.id
+                     << "类型:" << record.disasterType
+                     << "严重等级:" << record.severity
+                     << "灾害内容:"<<record.content
+                     << "系统报警时间:"<<record.systemAlarmAt
+                     << "发生时间:"<<record.occurredAt;
+        }
+    } else {
+        qDebug() << "查询失败:" << err;
     }
-
-    // 2. 获取配置实例，检查检测区域+卡片区域的完整配置
-    QSettings settings("MyCompany", "MonitorApp");
-
-    // 检测区域配置项（4个参数必须都存在）
-    bool hasDetectConfig = settings.contains("detectStartX") && settings.contains("detectWidth") &&
-                           settings.contains("detectStartY") && settings.contains("detectHeight");
-    // 卡片区域配置项（4个参数必须都存在）
-    bool hasCardConfig = settings.contains("cardStartX") && settings.contains("cardWidth") &&
-                         settings.contains("cardStartY") && settings.contains("cardHeight");
-
-    // 3. 配置不完整则弹窗提示
-    if (!hasDetectConfig || !hasCardConfig) {
-        QMessageBox::warning(this, "配置缺失", "需要先进行区域选定！\n请点击「区域选定」按钮完成检测区域和卡片区域的框选。", QMessageBox::Ok);
-        logTextEdit->append("<font color='red'><b>[模式2] 启动失败：未检测到完整的区域配置，请先完成区域选定</b></font>");
-        return;
-    }
-
-    // 4. 配置完整，读取参数并启动连续检测
-    // 读取监测区域参数（用于裁剪）
-    m_areaStartX = settings.value("detectStartX").toInt();
-    m_areaWidth = settings.value("detectWidth").toInt();
-    m_areaStartY = settings.value("detectStartY").toInt();
-    m_areaHeight = settings.value("detectHeight").toInt();
-
-    // 读取检测间隔（默认2秒）
-    int interval = settings.value("detectionInterval", 2).toInt() * 1000;
-
-    // 启动定时器
-    continuousTimer->start(interval);
-    isContinuousDetecting = true;
-
-    // 更新按钮状态
-    continuousDetectButton->setText("模式2:停止屏幕变化检测");
-    startButton->setEnabled(false);  // 模式1禁用
-    stopButton->setEnabled(true);    // 停止按钮启用
-
-    // 日志记录
-    logTextEdit->append(QString("[模式2] 启动成功！"));
-    logTextEdit->append(QString("[模式2] 监测间隔：%1秒 | 监测区域：X%2%（宽%3%），Y%4%（高%5%）")
-                        .arg(interval/1000)
-                        .arg(m_areaStartX).arg(m_areaWidth)
-                        .arg(m_areaStartY).arg(m_areaHeight));
 }
 void MainWindow::mode1(){
     // 1. 先停止当前可能正在运行的连续检测（避免重复启动）
@@ -590,7 +563,7 @@ void MainWindow::mode1(){
            logTextEdit->append("[模式1] 开始监测检测区域变化，变化时将展示卡片区域截图");
        }
 }
-// 新版OCR：仅检测红框（检测区域）变化，变化后展示绿框（卡片区域）[吴凯龙写]
+// 新版OCR：仅检测红框（检测区域）变化，对比变化前后OCR结果提取新增文字
 void MainWindow::newOCR()
 {
     QScreen *screen = QGuiApplication::primaryScreen();
@@ -618,12 +591,19 @@ void MainWindow::newOCR()
         int intervalSeconds = settings.value("detectionInterval", 5).toInt();
         if (elapsedSeconds >= intervalSeconds) {
             isMonitoringActive = true;
-            // 首次启动时初始化红框区域的基准帧
+            // 首次启动时初始化红框区域的基准帧 + 基准OCR文本
             int detectStartX = settings.value("detectStartX").toInt();
             int detectWidth = settings.value("detectWidth").toInt();
             int detectStartY = settings.value("detectStartY").toInt();
             int detectHeight = settings.value("detectHeight").toInt();
             m_croppedLastFrame = cropImageByPercent(currentFrame, detectStartX, detectWidth, detectStartY, detectHeight);
+
+            // 对初始基准帧做OCR，保存基准文本
+            if (!m_croppedLastFrame.empty()) {
+                OcrHelper ocrHelper;
+                m_lastOcrText = ocrHelper.recognizeText(m_croppedLastFrame);
+                logTextEdit->append(QString("[模式1] 首次基准OCR完成，初始文本长度：%1字符").arg(m_lastOcrText.length()));
+            }
 
             logTextEdit->append("[模式1] 首次计时完成，开始检测红框区域变化...");
         } else {
@@ -632,20 +612,14 @@ void MainWindow::newOCR()
     }
 
     try {
-        // 4. 读取配置：红框（检测区域）参数 + 绿框（卡片区域）参数
+        // 4. 读取配置：仅红框（检测区域）参数
         QSettings settings("MyCompany", "MonitorApp");
-        // 红框：检测区域参数（和模式2完全一致）
         int detectStartX = settings.value("detectStartX").toInt();
         int detectWidth = settings.value("detectWidth").toInt();
         int detectStartY = settings.value("detectStartY").toInt();
         int detectHeight = settings.value("detectHeight").toInt();
-        // 绿框：卡片区域参数
-        int cardStartX = settings.value("cardStartX").toInt();
-        int cardWidth = settings.value("cardWidth").toInt();
-        int cardStartY = settings.value("cardStartY").toInt();
-        int cardHeight = settings.value("cardHeight").toInt();
 
-        // 5. 核心：借鉴模式2逻辑，仅检测红框（检测区域）的变化
+        // 5. 核心：检测红框区域的变化
         // 5.1 裁剪当前帧的红框区域
         cv::Mat croppedFrame = cropImageByPercent(currentFrame, detectStartX, detectWidth, detectStartY, detectHeight);
         if (croppedFrame.empty()) {
@@ -653,7 +627,7 @@ void MainWindow::newOCR()
             return;
         }
 
-        // 5.2 对比红框区域的上一帧，计算变化比例（和模式2完全一致）
+        // 5.2 对比红框区域的上一帧，计算变化比例
         double changeRatio = 0.0;
         if (!m_croppedLastFrame.empty()) {
             // 计算两帧差异
@@ -673,50 +647,70 @@ void MainWindow::newOCR()
             changeRatio = totalPixels > 0 ? static_cast<double>(changedPixels) / totalPixels : 0.0;
         }
 
-        // 5.3 判断红框区域是否变化（阈值0.3%，和模式2一致）
+        // 5.3 判断红框区域是否变化（阈值0.3%）
         const double MIN_CHANGE_RATIO = 0.003;
         if (changeRatio > MIN_CHANGE_RATIO) {
-            // 红框区域变化，触发绿框展示逻辑
+            // 红框区域变化，触发OCR对比逻辑
             logTextEdit->append(QString("<font color='red'><b>[模式1] 红框区域发现变化！变化比例: %1%</b></font>")
                                 .arg(changeRatio * 100, 0, 'f', 2));
 
-            // 6. 裁剪绿框（卡片区域）截图
-            cv::Mat cardFrame = cropImageByPercent(currentFrame, cardStartX, cardWidth, cardStartY, cardHeight);
+            // 6. OCR对比：变化前（上一帧）vs 变化后（当前帧）
+            OcrHelper ocrHelper;
+            const QString currentOcrText = ocrHelper.recognizeText(croppedFrame);
+            const QString lastOcrText = m_lastOcrText;
 
-            QString type = settings.value("eventType").toString();
-            std::cout << "监测类型：" << type.toStdString() << std::endl;
-            logTextEdit->append(QString("[%1] [模式1] 监测类型：%2")
-                                .arg(QDateTime::currentDateTime().toString("HH:mm:ss"))
-                                .arg(type));
+            // 仅打印：旧消息（变化前）、新消息（变化后）
+            qDebug() << "旧消息：" << lastOcrText;
+            qDebug() << "新消息：" << currentOcrText;
 
-            if (!cardFrame.empty()) {
-                OcrHelper ocrHelper;
-                const QString cardText = ocrHelper.recognizeText(cardFrame);
-                logTextEdit->append(QString("[%1] [模式1] OCR：").arg(QDateTime::currentDateTime().toString("HH:mm:ss")));
-                logTextEdit->append(cardText.isEmpty() ? QStringLiteral("(空)") : cardText);
+            logTextEdit->append(QString("[%1] [模式1] 变化前OCR文本：").arg(QDateTime::currentDateTime().toString("HH:mm:ss")));
+            logTextEdit->append(lastOcrText.isEmpty() ? QStringLiteral("(空)") : lastOcrText);
+            logTextEdit->append(QString("[%1] [模式1] 变化后OCR文本：").arg(QDateTime::currentDateTime().toString("HH:mm:ss")));
+            logTextEdit->append(currentOcrText.isEmpty() ? QStringLiteral("(空)") : currentOcrText);
 
+            // 7. 提取新增文字（变化后有、变化前没有的内容）
+            QString newText = extractNewText(lastOcrText, currentOcrText);
+
+            DisasterRecord rec;
+
+            rec.content = newText;
+            rec.disasterType = "地震";
+            rec.location = "生活园B栋";
+            rec.severity = 3;
+
+            qint64 id;
+            QString err;
+              // 成功后 id 会被赋值
+              if (DisasterDao::createDisaster(rec, &id, &err)) {
+                  qDebug() << "灾害记录创建成功，ID:" << id;
+              } else {
+                  qDebug() << "创建失败:" << err;
+              }
+
+            // 仅打印：筛选出的新增消息
+            qDebug() << "筛选出的新增消息：" << newText;
+
+            if (!newText.isEmpty()) {
+                logTextEdit->append(QString("<font color='red'><b>[模式1] 检测到新增文字（新微信消息）：</b></font>"));
+                logTextEdit->append(newText);
+
+                // 触发报警（可选，保留原有报警逻辑）
+                QString type = settings.value("eventType").toString();
                 const QString trimmedType = type.trimmed();
-                if (!trimmedType.isEmpty() && !cardText.isEmpty()) {
+                if (!trimmedType.isEmpty()) {
                     QString compactType = trimmedType;
-                    compactType.remove(' ');
-                    compactType.remove('\n');
-                    compactType.remove('\r');
-                    compactType.remove('\t');
+                    compactType.remove(' ').remove('\n').remove('\r').remove('\t');
+                    QString compactNewText = newText;
+                    compactNewText.remove(' ').remove('\n').remove('\r').remove('\t');
 
-                    QString compactText = cardText;
-                    compactText.remove(' ');
-                    compactText.remove('\n');
-                    compactText.remove('\r');
-                    compactText.remove('\t');
-
-                    if (!compactType.isEmpty() && compactText.contains(compactType, Qt::CaseInsensitive)) {
-                        logTextEdit->append(QString("<font color='red'><b>[报警触发] 识别文本命中监测类型：%1</b></font>")
-                                            .arg(type));
+                    if (compactNewText.contains(compactType, Qt::CaseInsensitive)) {
+                        logTextEdit->append(QString("<font color='red'><b>[报警触发] 新增文字命中监测类型：%1</b></font>").arg(type));
                         m_imageProcessor.StartAlert();
                     }
                 }
 
-                const QStringList lines = cardText.split('\n', Qt::SkipEmptyParts);
+                // 保存新增文字到聊天记录（保留原有逻辑）
+                const QStringList lines = newText.split('\n', Qt::SkipEmptyParts);
                 if (!lines.isEmpty()) {
                     const QString latestLine = lines.last().trimmed();
                     ChatMessage chatMsg;
@@ -727,45 +721,38 @@ void MainWindow::newOCR()
                         m_chatHistory.pop_front();
                     }
                 }
+            } else {
+                logTextEdit->append("[模式1] 未检测到新增文字（仅格式/排版变化）");
             }
-            // 7. 界面展示：
-            // ---- 7.1 原始截图（红框标记检测区 + 绿框标记卡片区）----
+
+            // 8. 界面展示：仅展示红框区域的截图（标记红框）
             cv::Mat displayOriginal = currentFrame.clone();
-            // 画红框（检测区）
             int redX = (displayOriginal.cols * detectStartX) / 100;
             int redW = (displayOriginal.cols * detectWidth) / 100;
             int redY = (displayOriginal.rows * detectStartY) / 100;
             int redH = (displayOriginal.rows * detectHeight) / 100;
             cv::rectangle(displayOriginal, cv::Point(redX, redY), cv::Point(redX+redW, redY+redH), cv::Scalar(0,0,255), 2);
-            // 画绿框（卡片区）
-            int greenX = (displayOriginal.cols * cardStartX) / 100;
-            int greenW = (displayOriginal.cols * cardWidth) / 100;
-            int greenY = (displayOriginal.rows * cardStartY) / 100;
-            int greenH = (displayOriginal.rows * cardHeight) / 100;
-            cv::rectangle(displayOriginal, cv::Point(greenX, greenY), cv::Point(greenX+greenW, greenY+greenH), cv::Scalar(0,255,0), 2);
-            // 格式转换展示
+
             cv::cvtColor(displayOriginal, displayOriginal, cv::COLOR_BGR2RGB);
             QImage img1((const uchar*)displayOriginal.data, displayOriginal.cols, displayOriginal.rows, displayOriginal.step, QImage::Format_RGB888);
             imageLabel->setPixmap(QPixmap::fromImage(img1).scaled(imageLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
 
-            // ---- 7.2 单独展示绿框（卡片区域）截图 ----
-            if (!cardFrame.empty()) {
-                cv::Mat displayCard = cardFrame.clone();
-                cv::cvtColor(displayCard, displayCard, cv::COLOR_BGR2RGB);
-                QImage img2((const uchar*)displayCard.data, displayCard.cols, displayCard.rows, displayCard.step, QImage::Format_RGB888);
-                croppedLabel->setPixmap(QPixmap::fromImage(img2).scaled(croppedLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-                croppedLabel->setText(""); // 清空提示
-            } else {
-                croppedLabel->setText("⚠️ 绿框卡片区域裁剪失败");
-            }
+            // 8.2 单独展示红框区域截图
+            cv::Mat displayRedFrame = croppedFrame.clone();
+            cv::cvtColor(displayRedFrame, displayRedFrame, cv::COLOR_BGR2RGB);
+            QImage img2((const uchar*)displayRedFrame.data, displayRedFrame.cols, displayRedFrame.rows, displayRedFrame.step, QImage::Format_RGB888);
+            croppedLabel->setPixmap(QPixmap::fromImage(img2).scaled(croppedLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            croppedLabel->setText(""); // 清空提示
 
-            // 日志记录
-            logTextEdit->append(QString("[%1] [模式1] 红框区域变化触发 → 展示绿框卡片区域截图")
-                                .arg(QDateTime::currentDateTime().toString("HH:mm:ss")));
+            logTextEdit->append(QString("[%1] [模式1] 红框区域变化 → 展示红框区域截图").arg(QDateTime::currentDateTime().toString("HH:mm:ss")));
+
+            // 9. 更新基准：保存当前帧和当前OCR文本为下次对比的基准
+            m_croppedLastFrame = croppedFrame.clone();
+            m_lastOcrText = currentOcrText;
+        } else {
+            // 无变化时仅更新基准帧（不更新OCR，避免无意义的重复识别）
+            m_croppedLastFrame = croppedFrame.clone();
         }
-
-        // 8. 更新红框区域的上一帧（而非全屏，保证检测精准，和模式2一致）
-        m_croppedLastFrame = croppedFrame.clone();
 
     } catch (const cv::Exception& e) {
         std::cerr << "❌ OpenCV Exception: " << e.what() << std::endl;
@@ -774,4 +761,56 @@ void MainWindow::newOCR()
         std::cerr << "❌ Unknown Exception!" << std::endl;
         logTextEdit->append("<font color='red'><b>[模式1] 未知异常！</b></font>");
     }
+}
+
+// 辅助函数：提取变化后独有的文字（新消息）
+QString MainWindow::extractNewText(const QString& oldText, const QString& newText)
+{
+    // 预处理：去除空白字符，统一格式
+    auto preprocess = [](const QString& text) {
+        QString processed = text;
+        processed.remove(' ').remove('\n').remove('\r').remove('\t');
+        return processed;
+    };
+
+    QString oldProcessed = preprocess(oldText);
+    QString newProcessed = preprocess(newText);
+
+    // 如果无变化，直接返回空
+    if (oldProcessed == newProcessed) {
+        return "";
+    }
+
+    // 方法1：按行对比（适合聊天消息按行展示的场景）
+    QStringList oldLines = oldText.split('\n', Qt::SkipEmptyParts);
+    QStringList newLines = newText.split('\n', Qt::SkipEmptyParts);
+    QStringList newLinesOnly;
+
+    for (const QString& line : newLines) {
+        QString lineTrimmed = line.trimmed();
+        bool isNew = true;
+        for (const QString& oldLine : oldLines) {
+            if (oldLine.trimmed() == lineTrimmed) {
+                isNew = false;
+                break;
+            }
+        }
+        if (isNew && !lineTrimmed.isEmpty()) {
+            newLinesOnly.append(lineTrimmed);
+        }
+    }
+
+    // 方法2：字符级对比（备用，防止行分割问题）
+    if (newLinesOnly.isEmpty()) {
+        QString result;
+        for (int i = 0; i < newText.length(); ++i) {
+            QChar c = newText.at(i);
+            if (!oldText.contains(c) || oldText.count(c) < newText.count(c)) {
+                result.append(c);
+            }
+        }
+        return result.trimmed();
+    }
+
+    return newLinesOnly.join("\n");
 }
