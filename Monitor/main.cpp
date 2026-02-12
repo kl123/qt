@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "login.h"
 #include "ocrhelper.h"
+#include "index.h"
 #include <QApplication>
 #include <QCoreApplication>
 #include <QMessageBox>
@@ -301,8 +302,10 @@ int main(int argc, char *argv[])
 
     // 捕获C++异常，避免程序直接崩溃
     try {
-        MainWindow w;
-        w.show();
+        index in;
+        in.show();
+//        MainWindow w;
+//        w.show();
 //        Login l;
 //        l.show();
         return a.exec();

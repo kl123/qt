@@ -668,12 +668,12 @@ void MainWindow::newOCR()
             logTextEdit->append(QString("[%1] [模式1] 变化后OCR文本：").arg(QDateTime::currentDateTime().toString("HH:mm:ss")));
             logTextEdit->append(currentOcrText.isEmpty() ? QStringLiteral("(空)") : currentOcrText);
 
-            // 7. 提取新增文字（变化后有、变化前没有的内容）
+            // 7. 提取新增文字,下面这个进行一个AI接入，让其自动判断是否有灾害消息，有的话就进行一个格式整理然后插入
             QString newText = extractNewText(lastOcrText, currentOcrText);
 
             DisasterRecord rec;
 
-            rec.content = newText;
+            rec.content = newText;//
             rec.disasterType = "地震";
             rec.location = "生活园B栋";
             rec.severity = 3;
@@ -694,7 +694,7 @@ void MainWindow::newOCR()
                 logTextEdit->append(QString("<font color='red'><b>[模式1] 检测到新增文字（新微信消息）：</b></font>"));
                 logTextEdit->append(newText);
 
-                // 触发报警（可选，保留原有报警逻辑）
+                // 触发报警
                 QString type = settings.value("eventType").toString();
                 const QString trimmedType = type.trimmed();
                 if (!trimmedType.isEmpty()) {

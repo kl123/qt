@@ -1,6 +1,7 @@
 debug/fuzhu.o
 debug/image.o
 debug/disasterdao.o
+debug/index.o
 debug/login.o
 debug/main.o
 debug/mainwindow.o
@@ -17,6 +18,7 @@ debug/OcrUtils.o
 debug/clipper.o
 debug/qrc_audio.o
 debug/moc_fuzhu.o
+debug/moc_index.o
 debug/moc_login.o
 debug/moc_mainwindow.o
 debug/moc_monitorconfig.o

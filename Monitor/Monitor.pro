@@ -26,6 +26,7 @@ SOURCES += \
     fuzhu.cpp \
     image.cpp \
     disasterdao.cpp \
+    index.cpp \
     login.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -45,6 +46,7 @@ HEADERS += \
     disasterdao.h \
     fuzhu.h \
     image.h \
+    index.h \
     login.h \
     mainwindow.h \
     monitorconfig.h \
@@ -53,6 +55,7 @@ HEADERS += \
 
 FORMS += \
     fuzhu.ui \
+    index.ui \
     login.ui \
     mainwindow.ui \
     monitorconfig.ui
@@ -107,7 +110,7 @@ RESOURCES += \
     audio.qrc
 
 win32 {
-    RC_ICONS = monitor.ico
+    RC_ICONS = newLogo.ico
 }
 
 win32 {

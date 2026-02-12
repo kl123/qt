@@ -1,6 +1,7 @@
 release/fuzhu.o
 release/image.o
 release/disasterdao.o
+release/index.o
 release/login.o
 release/main.o
 release/mainwindow.o
@@ -17,6 +18,7 @@ release/OcrUtils.o
 release/clipper.o
 release/qrc_audio.o
 release/moc_fuzhu.o
+release/moc_index.o
 release/moc_login.o
 release/moc_mainwindow.o
 release/moc_monitorconfig.o
