@@ -15,7 +15,7 @@ win32 {
     }
 }
 
-QT       += core gui sql
+QT       += core gui sql network
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 CONFIG += c++17
 
@@ -25,6 +25,7 @@ DEFINES += _Frees_ptr_opt_=
 SOURCES += \
     fuzhu.cpp \
     image.cpp \
+    disasteranalyzer.cpp \
     disasterdao.cpp \
     index.cpp \
     login.cpp \
@@ -43,6 +44,7 @@ SOURCES += \
     third_party/RapidOcrOnnx/src/clipper.cpp
 
 HEADERS += \
+    disasteranalyzer.h \
     disasterdao.h \
     fuzhu.h \
     image.h \

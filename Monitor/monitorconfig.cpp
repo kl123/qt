@@ -7,15 +7,20 @@
 #include <QLabel>
 #include <QDialogButtonBox>
 #include <QSettings>
+#include <QCheckBox>
 #include <QMessageBox>
 #include <QTemporaryFile>
 #include <QResource>
 #include <QFile>
 #include <QDebug>
+#include <QDesktopServices>
+#include <QUrl>
 #include <windows.h>
 #include <mmsystem.h> // PlaySound 所需
 
+#ifdef _MSC_VER
 #pragma comment(lib, "winmm.lib") // 链接多媒体库
+#endif
 
 MonitorConfig::MonitorConfig(QWidget *parent)
     : QDialog(parent)
@@ -25,9 +30,9 @@ MonitorConfig::MonitorConfig(QWidget *parent)
     , m_loopTimer(new QTimer(this))
 {
     setWindowTitle("设置");
-    resize(400, 500);
+    resize(400, 550); // 稍微调高一点以容纳 AI 设置
 
-    // === 音频设置（保留不变）===
+    // === 音频设置 ===
     m_audioPathEdit = new QLineEdit(this);
     m_audioPathEdit->setReadOnly(true);
 
@@ -49,7 +54,7 @@ MonitorConfig::MonitorConfig(QWidget *parent)
     audioLayout->addWidget(m_audioPathEdit);
     audioGroup->setLayout(audioLayout);
 
-    // === 播放设置（保留不变）===
+    // === 播放设置 ===
     m_radioOnce = new QRadioButton("播放 1 次", this);
     m_radioInfinite = new QRadioButton("无限循环", this);
     m_radioCustom = new QRadioButton("自定义次数：", this);
@@ -73,27 +78,54 @@ MonitorConfig::MonitorConfig(QWidget *parent)
 
     m_radioOnce->setChecked(true);
 
-    // === 替换关键词监控为：事件类型+等级监测 ===
-    // 事件类型下拉框（固定选项：火灾、社会救助，默认选中火灾）
+    // === 事件监测设置 ===
     m_eventTypeCombo = new QComboBox(this);
     m_eventTypeCombo->addItem("火灾");
     m_eventTypeCombo->addItem("社会救助");
-    m_eventTypeCombo->setCurrentIndex(0); // 默认选中火灾
+    m_eventTypeCombo->setCurrentIndex(0);
 
-    // 等级选择（1-4级，默认1级）
     m_eventLevelSpin = new QSpinBox(this);
     m_eventLevelSpin->setRange(1, 10);
-    m_eventLevelSpin->setValue(1); // 默认1级
+    m_eventLevelSpin->setValue(1);
     m_eventLevelSpin->setSuffix(" 级");
 
-    // 布局：事件类型 + 等级
     QGroupBox *eventGroup = new QGroupBox("事件监测设置", this);
     QFormLayout *eventLayout = new QFormLayout;
     eventLayout->addRow("事件类型：", m_eventTypeCombo);
     eventLayout->addRow("事件等级：", m_eventLevelSpin);
     eventGroup->setLayout(eventLayout);
 
-    // === 屏幕检测间隔设置（保留不变）===
+    // === AI 配置 (新) ===
+    m_aiEnableCheck = new QCheckBox("启用 AI 分析 (推荐火山引擎 DeepSeek)", this);
+    
+    m_aiUrlEdit = new QLineEdit(this);
+    m_aiUrlEdit->setPlaceholderText("https://ark.cn-beijing.volces.com/api/v3");
+    m_aiUrlEdit->setText("https://ark.cn-beijing.volces.com/api/v3"); // 默认火山引擎
+    
+    m_aiKeyEdit = new QLineEdit(this);
+    m_aiKeyEdit->setEchoMode(QLineEdit::Password);
+    m_aiKeyEdit->setPlaceholderText("d42f588f-..."); // 示例 Key
+    
+    // 添加获取 Key 的链接
+    QLabel *getKeyLabel = new QLabel("<a href='https://console.volcengine.com/ark/region:ark+cn-beijing/endpoint'>点击此处获取火山引擎 API Key</a>", this);
+    getKeyLabel->setOpenExternalLinks(true);
+    getKeyLabel->setStyleSheet("QLabel { color: blue; text-decoration: underline; }");
+    getKeyLabel->setCursor(Qt::PointingHandCursor);
+
+    m_aiModelEdit = new QLineEdit(this);
+    m_aiModelEdit->setPlaceholderText("deepseek-v3-2-251201");
+    m_aiModelEdit->setText("deepseek-v3-2-251201"); // 默认 DeepSeek V3
+
+    QGroupBox *aiGroup = new QGroupBox("AI 设置 (已预设免费服务)", this);
+    QFormLayout *aiLayout = new QFormLayout;
+    aiLayout->addRow(m_aiEnableCheck);
+    aiLayout->addRow("API URL:", m_aiUrlEdit);
+    aiLayout->addRow("API Key:", m_aiKeyEdit);
+    aiLayout->addRow("", getKeyLabel);
+    aiLayout->addRow("模型名称:", m_aiModelEdit);
+    aiGroup->setLayout(aiLayout);
+
+    // === 屏幕检测间隔设置 ===
     m_intervalSpin = new QSpinBox(this);
     m_intervalSpin->setRange(1, 3600);
     m_intervalSpin->setValue(5);
@@ -107,7 +139,7 @@ MonitorConfig::MonitorConfig(QWidget *parent)
     intervalLayout->addStretch();
     intervalGroup->setLayout(intervalLayout);
 
-    // === 主题设置（保留不变）===
+    // === 主题设置 ===
     m_radioLight = new QRadioButton("明亮模式", this);
     m_radioDark = new QRadioButton("黑暗模式", this);
     m_radioLight->setChecked(true);
@@ -118,7 +150,7 @@ MonitorConfig::MonitorConfig(QWidget *parent)
     themeLayout->addWidget(m_radioDark);
     themeGroup->setLayout(themeLayout);
 
-    // === 底部按钮（保留不变）===
+    // === 底部按钮 ===
     m_playAudioButton = new QPushButton("播放音频", this);
     m_shutAudioButton = new QPushButton("停止播放", this);
     QPushButton *okButton = new QPushButton("确定", this);
@@ -130,14 +162,15 @@ MonitorConfig::MonitorConfig(QWidget *parent)
     connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
     connect(this, &QDialog::accepted, this, &MonitorConfig::saveSettings);
 
-    // 循环播放定时器（保留）
+    // 循环播放定时器
     connect(m_loopTimer, &QTimer::timeout, this, &MonitorConfig::onLoopTimerTimeout);
 
-    // === 主布局（调整：替换关键词GroupBox为事件GroupBox）===
+    // === 主布局 ===
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->addWidget(audioGroup);
     mainLayout->addWidget(playGroup);
-    mainLayout->addWidget(eventGroup); // 新增事件监测布局
+    mainLayout->addWidget(eventGroup);
+    mainLayout->addWidget(aiGroup);
     mainLayout->addWidget(intervalGroup);
     mainLayout->addWidget(themeGroup);
     mainLayout->addStretch();
@@ -164,7 +197,7 @@ MonitorConfig::~MonitorConfig()
     }
 }
 
-// ===== 槽函数（移除关键词相关，保留其他）=====
+// ===== 槽函数 =====
 void MonitorConfig::on_audioSourceCombo_changed(int index)
 {
     if (index == 0) {
@@ -194,7 +227,7 @@ void MonitorConfig::on_radioCustom_toggled(bool checked)
     m_spinCustom->setEnabled(checked);
 }
 
-// ===== 新增：获取事件类型和等级 =====
+// ===== Getters =====
 QString MonitorConfig::eventType() const
 {
     return m_eventTypeCombo->currentText();
@@ -205,7 +238,6 @@ int MonitorConfig::eventLevel() const
     return m_eventLevelSpin->value();
 }
 
-// ===== 原有音频相关逻辑（保留不变）=====
 QString MonitorConfig::audioFilePath() const
 {
     int index = m_audioSourceCombo->currentIndex();
@@ -237,6 +269,27 @@ int MonitorConfig::detectionIntervalSeconds() const
     return m_intervalSpin->value();
 }
 
+QString MonitorConfig::aiApiUrl() const
+{
+    return m_aiUrlEdit->text().trimmed();
+}
+
+QString MonitorConfig::aiApiKey() const
+{
+    return m_aiKeyEdit->text().trimmed();
+}
+
+QString MonitorConfig::aiModel() const
+{
+    return m_aiModelEdit->text().trimmed();
+}
+
+bool MonitorConfig::isAiEnabled() const
+{
+    return m_aiEnableCheck->isChecked();
+}
+
+// ===== Audio Logic =====
 QString MonitorConfig::extractBuiltInAudioToTemp()
 {
     if (!m_tempAudioPath.isEmpty() && QFile::exists(m_tempAudioPath)) {
@@ -282,21 +335,16 @@ void MonitorConfig::playAlertSound()
         realPath = filePath;
     }
 
-    // 停止当前播放
     stopAlertSound();
 
-    // 设置循环参数
     m_targetLoops = loopCount();
     m_currentLoop = 0;
 
-    // 立即播放第一次
     PlaySound((LPCWSTR)realPath.toStdWString().c_str(), NULL, SND_FILENAME | SND_ASYNC);
     m_currentLoop++;
 
-    // 如果需要循环
     if (m_targetLoops != 1) {
-        // 使用短延时确保声音结束（简单估算，实际不精确）
-        int durationMs = 2500; // 假设 1 秒（可根据实际调整）
+        int durationMs = 2500; 
         m_loopTimer->start(durationMs);
     }
 }
@@ -304,7 +352,7 @@ void MonitorConfig::playAlertSound()
 void MonitorConfig::stopAlertSound()
 {
     m_loopTimer->stop();
-    PlaySound(NULL, NULL, SND_FILENAME); // 停止所有播放
+    PlaySound(NULL, NULL, SND_FILENAME);
     m_currentLoop = 0;
 }
 
@@ -339,9 +387,7 @@ void MonitorConfig::onLoopTimerTimeout()
     PlaySound((LPCWSTR)realPath.toStdWString().c_str(), NULL, SND_FILENAME | SND_ASYNC);
     m_currentLoop++;
 
-    // 若无限循环，继续；否则检查是否达到上限
     if (m_targetLoops == -1) {
-        // 继续循环（保持定时器运行）
     } else if (m_currentLoop >= m_targetLoops) {
         m_loopTimer->stop();
     }
@@ -357,12 +403,11 @@ void MonitorConfig::on_shutAudioButton_clicked()
     stopAlertSound();
 }
 
-// ===== 设置保存/加载（修改：保存事件类型和等级，移除关键词）=====
+// ===== Settings =====
 void MonitorConfig::loadSettings()
 {
     QSettings settings("MyCompany", "MonitorApp");
 
-    // 音频设置（保留）
     int audioIndex = settings.value("audioSourceIndex", 0).toInt();
     m_audioSourceCombo->setCurrentIndex(audioIndex);
     on_audioSourceCombo_changed(audioIndex);
@@ -372,7 +417,6 @@ void MonitorConfig::loadSettings()
         m_audioPathEdit->setText(localPath);
     }
 
-    // 播放设置（保留）
     bool isOnce = settings.value("playOnce", true).toBool();
     bool isInfinite = settings.value("playInfinite", false).toBool();
     int customCount = settings.value("customCount", 3).toInt();
@@ -386,41 +430,58 @@ void MonitorConfig::loadSettings()
         m_spinCustom->setValue(customCount);
     }
 
-    // 新增：加载事件类型和等级（默认火灾、1级）
     QString eventType = settings.value("eventType", "火灾").toString();
     int eventLevel = settings.value("eventLevel", 1).toInt();
-    // 匹配事件类型下拉框索引
     int eventIndex = m_eventTypeCombo->findText(eventType);
     if (eventIndex != -1) {
         m_eventTypeCombo->setCurrentIndex(eventIndex);
     }
     m_eventLevelSpin->setValue(eventLevel);
 
-    // 主题设置（保留）
     bool isDark = settings.value("darkMode", false).toBool();
     m_radioDark->setChecked(isDark);
 
-    // 检测间隔（保留）
     int interval = settings.value("detectionInterval", 5).toInt();
     m_intervalSpin->setValue(interval);
+
+    // AI 设置
+    m_aiEnableCheck->setChecked(settings.value("aiEnabled", false).toBool());
+    
+    // 如果没有保存过 URL，使用默认值
+    QString savedUrl = settings.value("aiApiUrl", "").toString();
+    if (savedUrl.isEmpty()) {
+        savedUrl = "https://ark.cn-beijing.volces.com/api/v3";
+    }
+    m_aiUrlEdit->setText(savedUrl);
+
+    m_aiKeyEdit->setText(settings.value("aiApiKey", "d42f588f-420d-4a52-9c1f-d25feae6cba8").toString());
+    
+    // 如果没有保存过模型，使用默认值
+    QString savedModel = settings.value("aiModel", "").toString();
+    if (savedModel.isEmpty()) {
+        savedModel = "deepseek-v3-2-251201";
+    }
+    m_aiModelEdit->setText(savedModel);
 }
 
 void MonitorConfig::saveSettings()
 {
     QSettings settings("MyCompany", "MonitorApp");
 
-    // 音频设置（保留）
+    settings.setValue("aiEnabled", m_aiEnableCheck->isChecked());
+    settings.setValue("aiApiUrl", m_aiUrlEdit->text().trimmed());
+    settings.setValue("aiApiKey", m_aiKeyEdit->text().trimmed());
+    settings.setValue("aiModel", m_aiModelEdit->text().trimmed());
+
     settings.setValue("audioSourceIndex", m_audioSourceCombo->currentIndex());
     settings.setValue("localAudioPath", m_audioPathEdit->text());
     settings.setValue("playOnce", m_radioOnce->isChecked());
     settings.setValue("playInfinite", m_radioInfinite->isChecked());
     settings.setValue("customCount", m_spinCustom->value());
 
-    // 新增：保存事件类型和等级
     settings.setValue("eventType", m_eventTypeCombo->currentText());
     settings.setValue("eventLevel", m_eventLevelSpin->value());
 
-    // 保留其他设置
     settings.setValue("detectionInterval", m_intervalSpin->value());
     settings.setValue("darkMode", m_radioDark->isChecked());
 }

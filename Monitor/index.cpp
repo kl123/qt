@@ -1,4 +1,9 @@
 #include "index.h"
+#include "mainwindow.h"
+#include <QDesktopServices>
+#include <QUrl>
+
+#include "monitorconfig.h"
 
 index::index(QWidget *parent) : QMainWindow(parent)
 {
@@ -60,8 +65,21 @@ void index::setupTopNav()
     btnFireAlarm = new QPushButton("▶ 火警分析");
     btnElecFire = new QPushButton("▶ 电气火灾");
     btnNational = new QPushButton("▶ 全国总览");
+    btnConfig = new QPushButton("⚙ 系统设置");
 
-    QList<QPushButton*> navBtns = {btnRealTime, btnFireAlarm, btnElecFire, btnNational};
+    // 连接信号槽
+    connect(btnRealTime, &QPushButton::clicked, [=](){
+        MainWindow *w = new MainWindow();
+        w->setAttribute(Qt::WA_DeleteOnClose);
+        w->show();
+    });
+
+    connect(btnConfig, &QPushButton::clicked, [=](){
+        MonitorConfig dialog(this);
+        dialog.exec();
+    });
+
+    QList<QPushButton*> navBtns = {btnRealTime, btnFireAlarm, btnElecFire, btnNational, btnConfig};
     for (auto btn : navBtns) {
         btn->setMinimumSize(160, 50); // 减小按钮宽度，更紧凑
         btn->setFont(QFont("Microsoft YaHei", 14, QFont::Bold)); // 增大按钮字体

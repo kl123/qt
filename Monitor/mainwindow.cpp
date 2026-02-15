@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ocrhelper.h"
+#include "disasteranalyzer.h"
 #include <QPixmap>
 #include <QScreen>
 #include <QGuiApplication>
@@ -7,6 +8,7 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include "monitorconfig.h"
+#include <QDir>
 #include "image.h"
 #include <QSettings>
 #include <QDebug>
@@ -21,8 +23,8 @@ MainWindow::MainWindow(QWidget *parent)
       croppedLabel(new QLabel(this)),
       logTextEdit(new QTextEdit(this)),
       startButton(new QPushButton("模式1:关键词监测", this)),
-      AreaButton(new QPushButton("区域选定", this)),
       stopButton(new QPushButton("停止监测", this)),
+      AreaButton(new QPushButton("区域选定", this)),
       configButton(new QPushButton("参数配置", this)),
       timer(new QTimer(this)),
       testAlertButton(new QPushButton("测试警告", this)),
@@ -53,7 +55,7 @@ MainWindow::MainWindow(QWidget *parent)
     logTextEdit->setStyleSheet("QTextEdit { background-color: #eee; color: #333; font-family: Consolas, Monospace; }");
 
     // 连接信号槽
-    connect(startButton, &QPushButton::clicked, this, &MainWindow::onStartMonitoring);
+    connect(startButton, &QPushButton::clicked, this, &MainWindow::mode1);
     connect(stopButton, &QPushButton::clicked, this, &MainWindow::onStopMonitoring);
     connect(configButton, &QPushButton::clicked, this, &MainWindow::openConfig);
     connect(timer, &QTimer::timeout, this, &MainWindow::newOCR);
@@ -523,7 +525,7 @@ void MainWindow::mode1(){
     // 1. 先停止当前可能正在运行的连续检测（避免重复启动）
        if (isContinuousDetecting) {
            stopAllMonitoring();
-           return;
+           // return; // Removed to allow auto-restart in Mode 1
        }
 
        // 2. 获取配置实例，检查检测区域+卡片区域的完整配置
@@ -671,21 +673,32 @@ void MainWindow::newOCR()
             // 7. 提取新增文字,下面这个进行一个AI接入，让其自动判断是否有灾害消息，有的话就进行一个格式整理然后插入
             QString newText = extractNewText(lastOcrText, currentOcrText);
 
-            DisasterRecord rec;
+            // 仅当有新文字时才进行分析和入库
+            if (!newText.isEmpty()) {
+                // 读取 AI 配置
+                QSettings settings("MyCompany", "MonitorApp");
+                bool aiEnabled = settings.value("aiEnabled", false).toBool();
+                // 提供默认值，方便用户直接使用
+                QString aiUrl = settings.value("aiApiUrl", "https://ark.cn-beijing.volces.com/api/v3").toString();
+                QString aiKey = settings.value("aiApiKey", "d42f588f-420d-4a52-9c1f-d25feae6cba8").toString();
+                QString aiModel = settings.value("aiModel", "deepseek-v3-2-251201").toString();
 
-            rec.content = newText;//
-            rec.disasterType = "地震";
-            rec.location = "生活园B栋";
-            rec.severity = 3;
+                DisasterAnalyzer analyzer;
+                analyzer.setAiEnabled(aiEnabled);
+                analyzer.setAiConfig(aiUrl, aiKey, aiModel);
 
-            qint64 id;
-            QString err;
-              // 成功后 id 会被赋值
-              if (DisasterDao::createDisaster(rec, &id, &err)) {
-                  qDebug() << "灾害记录创建成功，ID:" << id;
-              } else {
-                  qDebug() << "创建失败:" << err;
-              }
+                logTextEdit->append("<font color='blue'><b>[AI] 正在进行智能分析...</b></font>");
+                DisasterRecord rec = analyzer.analyze(newText);
+
+                qint64 id;
+                QString err;
+                // 成功后 id 会被赋值
+                if (DisasterDao::createDisaster(rec, &id, &err)) {
+                    qDebug() << "灾害记录创建成功，ID:" << id << " 类型:" << rec.disasterType;
+                } else {
+                    qDebug() << "创建失败:" << err;
+                }
+            }
 
             // 仅打印：筛选出的新增消息
             qDebug() << "筛选出的新增消息：" << newText;

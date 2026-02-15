@@ -2,6 +2,7 @@
 #define MONITORCONFIG_H
 
 #include <QDialog>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QLineEdit>
 #include <QPushButton>
@@ -29,6 +30,12 @@ public:
     // 新增：事件类型和等级接口
     QString eventType() const;       // 获取选中的事件类型（火灾/社会救助）
     int eventLevel() const;          // 获取选中的等级（1-4级）
+
+    // 新增：AI 配置接口
+    QString aiApiUrl() const;
+    QString aiApiKey() const;
+    QString aiModel() const;
+    bool isAiEnabled() const;
 
     // 对外提供开启警告和关闭警告的方法
     void playAlertSound();
@@ -69,6 +76,12 @@ private:
 
     // 检测间隔（保留）
     QSpinBox *m_intervalSpin;
+
+    // AI 配置控件
+    QCheckBox *m_aiEnableCheck;
+    QLineEdit *m_aiUrlEdit;
+    QLineEdit *m_aiKeyEdit;
+    QLineEdit *m_aiModelEdit;
 
     // 新增：事件类型和等级控件（替换原关键词控件）
     QComboBox *m_eventTypeCombo;    // 事件类型下拉框（火灾/社会救助）
