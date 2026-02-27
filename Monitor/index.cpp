@@ -62,9 +62,9 @@ void index::setupTopNav()
 
     // 顶部导航按钮（增大字体）
     btnRealTime = new QPushButton("▶ 实时概览");
-    btnFireAlarm = new QPushButton("▶ 火警分析");
-    btnElecFire = new QPushButton("▶ 电气火灾");
-    btnNational = new QPushButton("▶ 全国总览");
+    btnFireAlarm = new QPushButton("▶ 灾情总览");
+    btnElecFire = new QPushButton("▶ 任务指派");
+    btnNational = new QPushButton("▶ 我的任务");
     btnConfig = new QPushButton("⚙ 系统设置");
 
     // 连接信号槽

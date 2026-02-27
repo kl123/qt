@@ -8,6 +8,8 @@
 #include <QMessageBox>
 #include <QStyle> // 图片缩放用
 #include"mainwindow.h"
+#include"index.h"
+#include <QDebug>
 
 // 全局布局常量（调整为更宽松的适配值，解决显示不全）
 const int LAYOUT_MARGIN = 12;     // 外边缘间距（缩小，增加内部空间）
@@ -619,12 +621,17 @@ void Login::on_btnLogin_clicked()
                                  QString("欢迎%1：%2\n所属单位：%3")
                                  .arg(loginUser.role).arg(loginUser.username)
                                  .arg(loginUser.unit.isEmpty() ? "无" : loginUser.unit));
+        qDebug() << "用户角色：" << loginUser.role;
+         qDebug() << "用户id：" << loginUser.id;
+        QSettings settings("System", "disaster");
+        settings.setValue("role",loginUser.role);
+        settings.setValue("userid",loginUser.id);
         // ========== 新增/修改部分 ==========
         // 1. 关闭登录窗口（保留 accept 也可以，accept 会触发 dialog 的 finished 信号）
         this->close();
 
         // 2. 创建并显示主界面（假设你的主界面类是 MainWindow，需提前包含头文件）
-        MainWindow *mainWin = new MainWindow; // 主界面对象
+        index *mainWin = new index; // 主界面对象
         mainWin->setAttribute(Qt::WA_DeleteOnClose); // 关闭时自动释放内存
         mainWin->show(); // 显示主界面
         // ========== 结束 ==========

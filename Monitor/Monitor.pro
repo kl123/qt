@@ -33,6 +33,7 @@ SOURCES += \
     mainwindow.cpp \
     monitorconfig.cpp \
     ocrhelper.cpp \
+    overview.cpp \
     userauth.cpp \
     third_party/RapidOcrOnnx/src/AngleNet.cpp \
     third_party/RapidOcrOnnx/src/CrnnNet.cpp \
@@ -53,6 +54,7 @@ HEADERS += \
     mainwindow.h \
     monitorconfig.h \
     ocrhelper.h \
+    overview.h \
     userauth.h
 
 FORMS += \
@@ -60,7 +62,8 @@ FORMS += \
     index.ui \
     login.ui \
     mainwindow.ui \
-    monitorconfig.ui
+    monitorconfig.ui \
+    overview.ui
 
 QT += multimedia
 

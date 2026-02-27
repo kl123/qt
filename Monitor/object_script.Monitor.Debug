@@ -1,5 +1,6 @@
 debug/fuzhu.o
 debug/image.o
+debug/disasteranalyzer.o
 debug/disasterdao.o
 debug/index.o
 debug/login.o
@@ -7,6 +8,7 @@ debug/main.o
 debug/mainwindow.o
 debug/monitorconfig.o
 debug/ocrhelper.o
+debug/overview.o
 debug/userauth.o
 debug/AngleNet.o
 debug/CrnnNet.o
@@ -17,8 +19,10 @@ debug/OcrResultUtils.o
 debug/OcrUtils.o
 debug/clipper.o
 debug/qrc_audio.o
+debug/moc_disasteranalyzer.o
 debug/moc_fuzhu.o
 debug/moc_index.o
 debug/moc_login.o
 debug/moc_mainwindow.o
 debug/moc_monitorconfig.o
+debug/moc_overview.o
