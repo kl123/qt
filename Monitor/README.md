@@ -329,6 +329,30 @@
   }
   ```
 
+#### 1.7 获取调度员下属处置员
+查询某位调度员（通过其用户ID）所关联的所有现场处置员信息。
+
+- **接口定义**
+  ```cpp
+  static bool getHandlersByDispatcherId(qint64 dispatcherId, 
+                                        QList<DispatcherInfo>* handlers, 
+                                        QString* errorMessage);
+  ```
+
+- **输入参数**
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| dispatcherId | qint64 | 指挥调度员的用户ID |
+
+- **输出参数 / 返回值**
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| handlers | QList<DispatcherInfo>* | 返回的处置员列表，复用 `DispatcherInfo` 结构体 |
+| errorMessage | QString* | 错误信息 |
+| (return) | bool | 成功返回 `true`，失败返回 `false` |
+
 ---
 
 ### 2. 灾害数据管理 (DisasterDao)
@@ -384,6 +408,19 @@
 | `orderBy` | `enum OrderBy` | 排序方式 (CreatedAtDesc, CreatedAtAsc, SeverityDesc 等) |
 | `limit` | `int` | 返回记录数量限制 (默认50) |
 | `offset` | `int` | 分页偏移量 (默认0) |
+
+##### **2.0.4 DisasterTaskRecord (灾害任务记录)**
+用于灾害任务的指派和管理，关联了处置员的直观数据。
+
+| 字段名 | 类型 | 说明 |
+|---|---|---|
+| `id` | `qint64` | 指派记录ID |
+| `disasterId` | `qint64` | 灾害本身ID |
+| `handlerUserId` | `qint64` | 现场处置员ID |
+| `progress` | `int` | 进度 (0-100) |
+| `assignedAt` | `QString` | 指派时间 |
+| `handlerName` | `QString` | (关联数据) 处置员姓名 |
+| `handlerPhone` | `QString` | (关联数据) 处置员电话 |
 
 #### 2.1 创建灾害记录
 - **接口定义**
@@ -518,6 +555,53 @@
 |---|---|---|
 | errorMessage | QString* | 错误信息 |
 | (return) | bool | 成功返回 `true`，失败返回 `false` |
+
+#### 2.5 获取未指派灾害
+获取特定调度员负责的，且尚未被下发包含在 `disaster_tasks` 中的剩余灾害警情。
+
+- **接口定义**
+  ```cpp
+  static bool getUnassignedDisastersByDispatcher(
+      qint64 dispatcherId, qint64 unitId, int limit, int offset,
+      QList<DisasterRecord>* records, QString* errorMessage);
+  ```
+
+#### 2.6 分配灾害任务
+将某个灾害警情指派给一至多名现场处置员进行处理，自动开启事务绑定。
+
+- **接口定义**
+  ```cpp
+  static bool assignDisasterTasks(qint64 disasterId, const QList<qint64>& handlerIds, QString* errorMessage);
+  ```
+
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| disasterId | qint64 | 需要指派的灾害ID |
+| handlerIds | QList<qint64> | 参与处理的多名处置员ID列表 |
+
+#### 2.7 获取灾害任务列表
+根据特定的灾害ID，返回包含全部接单人信息以及他们各自处理进度的综合任务记录列表。
+
+- **接口定义**
+  ```cpp
+  static bool getTasksForDisaster(qint64 disasterId, QList<DisasterTaskRecord>* tasks, QString* errorMessage);
+  ```
+
+#### 2.8 更新灾害任务进度
+更改某个指定任务单（`disaster_tasks`）进度。
+
+- **接口定义**
+  ```cpp
+  static bool updateDisasterTaskProgress(qint64 taskId, int progress, QString* errorMessage);
+  ```
+
+#### 2.9 删除灾害任务
+撤回（删除）特定分派给某人的灾害任务记录。
+
+- **接口定义**
+  ```cpp
+  static bool deleteDisasterTask(qint64 taskId, QString* errorMessage);
+  ```
 
 ---
 
