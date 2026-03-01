@@ -28,12 +28,18 @@ struct DispatcherInfo {
  * 用于登录后返回的完整用户信息
  */
 struct AuthUser {
-  qint64 id = 0;               // 用户ID
-  QString username;            // 用户名
-  QString phone;               // 手机号
-  QString role;                // 角色 (如"指挥调度员", "现场处置员")
-  QString unit;                // 所属单位名称
-  qint64 dispatcherUserId = 0; // 绑定的调度员ID (仅当角色为处置员时有效)
+  /** @brief 系统内部用户唯一标识ID */
+  qint64 id = 0;
+  /** @brief 登录账号名称 */
+  QString username;
+  /** @brief 绑定的有效联系电话 */
+  QString phone;
+  /** @brief 核心业务角色 (e.g. "指挥调度员", "现场处置员") */
+  QString role;
+  /** @brief 所属行政/事业机构名称 */
+  QString unit;
+  /** @brief 关联的领队调度员ID (仅在角色为 '现场处置员' 时作为父级索引有效) */
+  qint64 dispatcherUserId = 0;
 };
 
 class UserAuth {

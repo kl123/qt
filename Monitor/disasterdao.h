@@ -108,14 +108,30 @@ public:
   static bool createDisaster(const DisasterRecord &record, qint64 *id,
                              QString *errorMessage);
 
-  // 根据ID获取灾害记录
+  /**
+   * @brief 根据唯一ID获取灾害详细记录
+   * @param id 灾害记录ID
+   * @param record 用于接收查询结果的结构体指针
+   * @param errorMessage 失败时的详细错误描述输出
+   * @return 查询成功且记录存在返回 true，否则返回 false
+   */
   static bool getDisasterById(qint64 id, DisasterRecord *record,
                               QString *errorMessage);
 
-  // 更新灾害记录
+  /**
+   * @brief 局部更新灾害记录信息 (Patch模式)
+   * @param patch 包含待更新字段及其标志位的补丁对象
+   * @param errorMessage 失败时的详细错误描述输出
+   * @return 更新成功且受影响行数大于0返回 true
+   */
   static bool updateDisaster(const DisasterPatch &patch, QString *errorMessage);
 
-  // 删除灾害记录
+  /**
+   * @brief 物理删除指定的灾害记录
+   * @param id 待删除的灾害记录ID
+   * @param errorMessage 失败时的详细错误描述输出
+   * @return 删除成功返回 true
+   */
   static bool deleteDisaster(qint64 id, QString *errorMessage);
 
   // 获取调度员相关的未被指派的灾害
@@ -137,11 +153,22 @@ public:
                                   QList<DisasterTaskRecord> *tasks,
                                   QString *errorMessage);
 
-  // 修改灾害指派任务进度
+  /**
+   * @brief 修改指定的灾害指派任务进度
+   * @param taskId 任务分派表中的唯一任务ID
+   * @param progress 新进度值 (自动限制在 0-100 范围内)
+   * @param errorMessage 失败时的详细错误描述输出
+   * @return 修改成功返回 true
+   */
   static bool updateDisasterTaskProgress(qint64 taskId, int progress,
                                          QString *errorMessage);
 
-  // 删除特定的灾害指派任务
+  /**
+   * @brief 撤销/删除特定的灾害指派任务
+   * @param taskId 待撤销的任务ID
+   * @param errorMessage 失败时的详细错误描述输出
+   * @return 删除成功返回 true，若任务不存在则返回 false 并填充错误说明
+   */
   static bool deleteDisasterTask(qint64 taskId, QString *errorMessage);
 
   // 综合查询灾害记录

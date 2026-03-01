@@ -32,7 +32,7 @@ static bool ensureSqliteConnection(QString *errorMessage) {
   }
 
   QSqlQuery pragma(db);
-  if (!pragma.exec("PRAGMA foreign_keys = ON;")) {
+  if (!pragma.exec(QStringLiteral("PRAGMA foreign_keys = ON;"))) {
     if (errorMessage) {
       *errorMessage = pragma.lastError().text();
     }
@@ -99,7 +99,7 @@ bool DisasterDao::createDisaster(const DisasterRecord &record, qint64 *id,
   const QString type = record.disasterType.trimmed();
   if (type.isEmpty()) {
     if (errorMessage) {
-      *errorMessage = "灾害类型不能为空";
+      *errorMessage = QStringLiteral("灾害类型不能为空");
     }
     return false;
   }
@@ -589,12 +589,24 @@ bool DisasterDao::assignDisasterTasks(qint64 disasterId,
                                       QString *errorMessage) {
   if (disasterId <= 0) {
     if (errorMessage)
-      *errorMessage = "无效的灾害ID";
+      *errorMessage = QStringLiteral("非法操作：无效的灾害ID");
     return false;
   }
-  if (handlerIds.isEmpty()) {
+
+  // ---
+  // 逻辑优化重构：增加指派人员列表的自动清洗与去重，预防前端误操作导致的重复派单漏洞
+  // ---
+  QList<qint64> validHandlerIds;
+  for (qint64 hid : handlerIds) {
+    if (hid > 0 && !validHandlerIds.contains(hid)) {
+      validHandlerIds.append(hid);
+    }
+  }
+
+  if (validHandlerIds.isEmpty()) {
     if (errorMessage)
-      *errorMessage = "未选择任何处理人";
+      *errorMessage =
+          QStringLiteral("派发失败：未筛选到任何有效的现场处置员工号");
     return false;
   }
 
@@ -604,26 +616,28 @@ bool DisasterDao::assignDisasterTasks(qint64 disasterId,
       *errorMessage = connError;
     return false;
   }
-  QSqlDatabase db = QSqlDatabase::database("app_sqlite");
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
 
-  // 开启事务进行批量插入
+  // 开启事务进行批量安全插入
   if (!db.transaction()) {
     if (errorMessage)
-      *errorMessage = "无法开启数据库事务: " + db.lastError().text();
+      *errorMessage =
+          QStringLiteral("无法开启数据库事务: ") + db.lastError().text();
     return false;
   }
 
   QSqlQuery query(db);
-  query.prepare("INSERT INTO disaster_tasks(disaster_id, handler_user_id, "
-                "progress) VALUES(?, ?, 0);");
+  query.prepare(QStringLiteral("INSERT INTO disaster_tasks(disaster_id, "
+                               "handler_user_id, progress) VALUES(?, ?, 0);"));
 
-  for (qint64 handlerId : handlerIds) {
+  for (qint64 handlerId : validHandlerIds) { // 遍历经过过滤的人员
     query.bindValue(0, disasterId);
     query.bindValue(1, handlerId);
     if (!query.exec()) {
       db.rollback();
       if (errorMessage)
-        *errorMessage = "指派处理人失败: " + query.lastError().text();
+        *errorMessage = QStringLiteral("并行指派处理人异常回滚: ") +
+                        query.lastError().text();
       return false;
     }
   }
@@ -631,7 +645,8 @@ bool DisasterDao::assignDisasterTasks(qint64 disasterId,
   if (!db.commit()) {
     db.rollback();
     if (errorMessage)
-      *errorMessage = "提交事务失败: " + db.lastError().text();
+      *errorMessage =
+          QStringLiteral("提交指派事务失败: ") + db.lastError().text();
     return false;
   }
 
@@ -695,13 +710,18 @@ bool DisasterDao::updateDisasterTaskProgress(qint64 taskId, int progress,
                                              QString *errorMessage) {
   if (taskId <= 0) {
     if (errorMessage)
-      *errorMessage = "无效的任务ID";
+      *errorMessage = QStringLiteral("拒接操作：无效的任务流水号");
     return false;
   }
-  if (progress < 0)
+
+  // ---
+  // 边界逻辑优化：增加严格的数据安全范围修剪，避免底层数据透视或超出进度溢出
+  // ---
+  if (progress < 0) {
     progress = 0;
-  if (progress > 100)
-    progress = 100;
+  } else if (progress >= 100) {
+    progress = 100; // 进度达满即为强制结转归档状态
+  }
 
   QString connError;
   if (!ensureSqliteConnection(&connError)) {
@@ -709,10 +729,11 @@ bool DisasterDao::updateDisasterTaskProgress(qint64 taskId, int progress,
       *errorMessage = connError;
     return false;
   }
-  QSqlDatabase db = QSqlDatabase::database("app_sqlite");
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
 
   QSqlQuery query(db);
-  query.prepare("UPDATE disaster_tasks SET progress = ? WHERE id = ?;");
+  query.prepare(
+      QStringLiteral("UPDATE disaster_tasks SET progress = ? WHERE id = ?;"));
   query.addBindValue(progress);
   query.addBindValue(taskId);
 
@@ -724,7 +745,8 @@ bool DisasterDao::updateDisasterTaskProgress(qint64 taskId, int progress,
 
   if (query.numRowsAffected() == 0) {
     if (errorMessage)
-      *errorMessage = "找不到该任务记录，进度更新失败";
+      *errorMessage = QStringLiteral(
+          "核对未命中：找不到该活跃任务记录，可能已被撤销或删除");
     return false;
   }
 
@@ -734,7 +756,7 @@ bool DisasterDao::updateDisasterTaskProgress(qint64 taskId, int progress,
 bool DisasterDao::deleteDisasterTask(qint64 taskId, QString *errorMessage) {
   if (taskId <= 0) {
     if (errorMessage)
-      *errorMessage = "无效的任务ID";
+      *errorMessage = QStringLiteral("无效的任务ID");
     return false;
   }
 
@@ -744,10 +766,25 @@ bool DisasterDao::deleteDisasterTask(qint64 taskId, QString *errorMessage) {
       *errorMessage = connError;
     return false;
   }
-  QSqlDatabase db = QSqlDatabase::database("app_sqlite");
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
+
+  // --- 健壮性增强：删除前先核实该任务在系统中是否确实存在 ---
+  QSqlQuery checkQuery(db);
+  checkQuery.prepare(
+      QStringLiteral("SELECT count(*) FROM disaster_tasks WHERE id = ?;"));
+  checkQuery.addBindValue(taskId);
+  if (checkQuery.exec() && checkQuery.next()) {
+    if (checkQuery.value(0).toInt() == 0) {
+      if (errorMessage)
+        *errorMessage =
+            QStringLiteral("操作失败：任务ID %1 在系统中不存在，无法执行撤销")
+                .arg(taskId);
+      return false;
+    }
+  }
 
   QSqlQuery query(db);
-  query.prepare("DELETE FROM disaster_tasks WHERE id = ?;");
+  query.prepare(QStringLiteral("DELETE FROM disaster_tasks WHERE id = ?;"));
   query.addBindValue(taskId);
 
   if (!query.exec()) {
@@ -758,7 +795,7 @@ bool DisasterDao::deleteDisasterTask(qint64 taskId, QString *errorMessage) {
 
   if (query.numRowsAffected() == 0) {
     if (errorMessage)
-      *errorMessage = "找不到该任务记录，删除失败";
+      *errorMessage = QStringLiteral("任务记录状态已变更，删除失败");
     return false;
   }
 

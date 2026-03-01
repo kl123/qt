@@ -712,13 +712,13 @@ bool UserAuth::login(const QString &username, const QString &password,
                      AuthUser *user, QString *errorMessage) {
   if (username.trimmed().isEmpty()) {
     if (errorMessage) {
-      *errorMessage = "用户名不能为空";
+      *errorMessage = QStringLiteral("登录失败：用户名不能为空");
     }
     return false;
   }
   if (password.isEmpty()) {
     if (errorMessage) {
-      *errorMessage = "密码不能为空";
+      *errorMessage = QStringLiteral("登录失败：密码不能为空");
     }
     return false;
   }
@@ -731,7 +731,7 @@ bool UserAuth::login(const QString &username, const QString &password,
     return false;
   }
 
-  QSqlDatabase db = QSqlDatabase::database("app_sqlite");
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
   QString schemaError;
   if (!ensureUnitSchema(db, &schemaError)) {
     if (errorMessage) {
@@ -741,12 +741,13 @@ bool UserAuth::login(const QString &username, const QString &password,
   }
 
   QSqlQuery query(db);
-  query.prepare("SELECT u.id, u.username, u.password, u.phone, u.role, "
-                "COALESCE(units.name, u.unit), u.dispatcher_user_id "
-                "FROM users u "
-                "LEFT JOIN units ON units.id = u.unit_id "
-                "WHERE u.username = ? "
-                "LIMIT 1;");
+  query.prepare(
+      QStringLiteral("SELECT u.id, u.username, u.password, u.phone, u.role, "
+                     "COALESCE(units.name, u.unit), u.dispatcher_user_id "
+                     "FROM users u "
+                     "LEFT JOIN units ON units.id = u.unit_id "
+                     "WHERE u.username = ? "
+                     "LIMIT 1;"));
   query.addBindValue(username.trimmed());
 
   if (!query.exec()) {
@@ -758,7 +759,7 @@ bool UserAuth::login(const QString &username, const QString &password,
 
   if (!query.next()) {
     if (errorMessage) {
-      *errorMessage = "用户不存在";
+      *errorMessage = QStringLiteral("用户验证失败：账号不存在");
     }
     return false;
   }
