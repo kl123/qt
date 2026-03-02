@@ -3,106 +3,11 @@
 #include <QDebug>
 #include <QCoreApplication>
 #include <QFileInfo>
+#include <QProcess>
+#include <QTemporaryFile>
+#include <QFile>
 
-#include <onnxruntime_c_api.h>
-
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#include <cstdlib>
-#include <new>
-#include <vector>
-
-#include "OcrLite.h"
-
-namespace std {
-__attribute__((weak)) [[noreturn]] void __throw_bad_array_new_length() {
-#if defined(__cpp_exceptions) && __cpp_exceptions
-    throw bad_array_new_length();
-#else
-    std::abort();
-#endif
-}
-}
-
-static std::wstring exeDirPathW() {
-    wchar_t buffer[MAX_PATH];
-    DWORD len = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
-    if (len == 0 || len >= MAX_PATH) {
-        return L"";
-    }
-    std::wstring full(buffer, len);
-    size_t pos = full.find_last_of(L"\\/"); 
-    if (pos == std::wstring::npos) {
-        return L"";
-    }
-    return full.substr(0, pos);
-}
-
-static std::wstring normalizePath(const std::wstring& p) {
-    wchar_t out[MAX_PATH];
-    DWORD len = GetFullPathNameW(p.c_str(), MAX_PATH, out, nullptr);
-    if (len == 0 || len >= MAX_PATH) {
-        return p;
-    }
-    return std::wstring(out, len);
-}
-
-static bool fileExistsW(const std::wstring& p) {
-    DWORD attrs = GetFileAttributesW(p.c_str());
-    return (attrs != INVALID_FILE_ATTRIBUTES) && !(attrs & FILE_ATTRIBUTE_DIRECTORY);
-}
-
-using OrtGetApiBaseFn = const OrtApiBase* (ORT_API_CALL*)();
-
-extern "C" const OrtApiBase* ORT_API_CALL OrtGetApiBase(void) NO_EXCEPTION {
-    static HMODULE ortModule = nullptr;
-    static OrtGetApiBaseFn realOrtGetApiBase = nullptr;
-
-    if (realOrtGetApiBase) {
-        return realOrtGetApiBase();
-    }
-
-    auto tryLoad = [&](const std::wstring& dllPath) -> bool {
-        std::wstring full = normalizePath(dllPath);
-        if (!fileExistsW(full)) {
-            return false;
-        }
-        ortModule = LoadLibraryW(full.c_str());
-        return ortModule != nullptr;
-    };
-
-    const std::wstring exeDir = exeDirPathW();
-    if (!exeDir.empty()) {
-        std::vector<std::wstring> candidates = {
-            exeDir + L"\\onnxruntime.dll",
-            exeDir + L"\\..\\asset\\onnxruntime-win-x64-1.15.1\\lib\\onnxruntime.dll",
-            exeDir + L"\\..\\..\\asset\\onnxruntime-win-x64-1.15.1\\lib\\onnxruntime.dll",
-            exeDir + L"\\..\\..\\..\\asset\\onnxruntime-win-x64-1.15.1\\lib\\onnxruntime.dll",
-        };
-        for (const auto& c : candidates) {
-            if (tryLoad(c)) {
-                break;
-            }
-        }
-    }
-
-    if (!ortModule) {
-        ortModule = LoadLibraryW(L"onnxruntime.dll");
-    }
-
-    if (!ortModule) {
-        std::abort();
-    }
-
-    realOrtGetApiBase = reinterpret_cast<OrtGetApiBaseFn>(GetProcAddress(ortModule, "OrtGetApiBase"));
-    if (!realOrtGetApiBase) {
-        std::abort();
-    }
-    return realOrtGetApiBase();
-}
-
+// 辅助函数：查找目录
 static QString findDirWithChild(const QString& startDir, const QString& childDirName, int maxUp) {
     QDir dir(startDir);
     for (int i = 0; i <= maxUp; ++i) {
@@ -126,29 +31,6 @@ static QString findAssetDir() {
     return QDir(base).filePath("asset");
 }
 
-static bool initRapidOcrOnce(OcrLite& engine) {
-    const QString assetDir = findAssetDir();
-    if (assetDir.isEmpty()) {
-        return false;
-    }
-
-    const QString modelDir = QDir(assetDir).filePath("RapidOCR/models");
-    const QString det = QDir(modelDir).filePath("ch_PP-OCRv3_det_infer.onnx");
-    const QString cls = QDir(modelDir).filePath("ch_ppocr_mobile_v2.0_cls_infer.onnx");
-    const QString rec = QDir(modelDir).filePath("ch_PP-OCRv3_rec_infer.onnx");
-    const QString keys = QDir(modelDir).filePath("ppocr_keys_v1.txt");
-
-    if (!QFileInfo(det).exists() || !QFileInfo(cls).exists() || !QFileInfo(rec).exists() || !QFileInfo(keys).exists()) {
-        return false;
-    }
-
-    engine.setNumThread(4);
-    engine.initLogger(false, false, false);
-    engine.setGpuIndex(-1);
-
-    return engine.initModels(det.toStdString(), cls.toStdString(), rec.toStdString(), keys.toStdString());
-}
-
 OcrHelper::OcrHelper()
 {
 }
@@ -169,8 +51,10 @@ cv::Mat OcrHelper::preprocessImageForOCR(const cv::Mat &input)
         processed = input.clone();
     }
 
+    // 调整大小，放大2倍以提高识别率
     cv::resize(processed, processed, cv::Size(), 2.0, 2.0, cv::INTER_CUBIC);
 
+    // 锐化
     cv::Mat kernel = (cv::Mat_<float>(3,3) <<
                       0, -1, 0,
                       -1, 5, -1,
@@ -188,20 +72,56 @@ QString OcrHelper::recognizeText(const cv::Mat &image)
 
     cv::Mat processedImg = preprocessImageForOCR(image);
 
-    static OcrLite engine;
-    static bool initialized = false;
-    static bool initOk = false;
-    if (!initialized) {
-        initOk = initRapidOcrOnce(engine);
-        initialized = true;
-    }
-
-    if (!initOk) {
+    // 1. 保存图片到临时文件
+    QString tempImgPath = QDir::temp().filePath("monitor_ocr_temp.png");
+    if (!cv::imwrite(tempImgPath.toStdString(), processedImg)) {
+        qDebug() << "Failed to save temp image for OCR";
         return QString();
     }
 
-    OcrResult result = engine.detect(processedImg, 50, 1024, 0.5f, 0.3f, 1.6f, true, true);
-    return QString::fromStdString(result.strRes).trimmed();
+    // 2. 查找 Tesseract 可执行文件
+    QString assetDir = findAssetDir();
+    if (assetDir.isEmpty()) {
+        qDebug() << "Asset dir not found";
+        return QString();
+    }
+    QString tesseractExe = QDir(assetDir).filePath("Tesseract-OCR/tesseract.exe");
+    QString tessDataDir = QDir(assetDir).filePath("Tesseract-OCR/tessdata");
+
+    if (!QFileInfo(tesseractExe).exists()) {
+        qDebug() << "Tesseract exe not found at:" << tesseractExe;
+        return QString();
+    }
+
+    // 3. 调用 Tesseract
+    QProcess process;
+    // 设置 TESSDATA_PREFIX 环境变量
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("TESSDATA_PREFIX", tessDataDir);
+    process.setProcessEnvironment(env);
+
+    QStringList args;
+    args << tempImgPath << "stdout" << "-l" << "chi_sim+eng";
+
+    process.start(tesseractExe, args);
+    if (!process.waitForFinished(10000)) { // 等待最多10秒
+        qDebug() << "Tesseract process timed out or failed";
+        return QString();
+    }
+
+    QByteArray output = process.readAllStandardOutput();
+    QByteArray error = process.readAllStandardError();
+
+    if (!error.isEmpty()) {
+        // Tesseract 输出很多 info 到 stderr，不一定是错误
+        // qDebug() << "Tesseract stderr:" << error;
+    }
+
+    // 清理临时文件
+    QFile::remove(tempImgPath);
+
+    QString result = QString::fromUtf8(output).trimmed();
+    return result;
 }
 
 QString OcrHelper::extractNewMessage(const QString &oldText, const QString &newText)

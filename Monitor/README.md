@@ -487,7 +487,7 @@
 - **接口定义**
   ```cpp
   static bool getUnassignedDisastersByDispatcher(
-      qint64 dispatcherId, qint64 unitId, int limit, int offset,
+      qint64 dispatcherId, int limit, int offset,
       QList<DisasterRecord>* records, QString* errorMessage);
   ```
 
@@ -495,7 +495,6 @@
 | 参数名 | 类型 | 说明 |
 |---|---|---|
 | dispatcherId | qint64 | 指挥调度员ID |
-| unitId | qint64 | 单位ID |
 | limit | int | 返回限制 |
 | offset | int | 偏移量 |
 
@@ -510,7 +509,7 @@
   ```cpp
   QList<DisasterRecord> unassigned;
   QString err;
-  if (DisasterDao::getUnassignedDisastersByDispatcher(101, 1, 50, 0, &unassigned, &err)) {
+  if (DisasterDao::getUnassignedDisastersByDispatcher(101, 50, 0, &unassigned, &err)) {
       for(const auto& r : unassigned) qDebug() << r.id;
   }
   ```

@@ -5,6 +5,7 @@
 #include "ocrhelper.h"
 #include <QApplication>
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -284,6 +285,101 @@ static bool initSqliteSchema(QString *errorMessage) {
   return true;
 }
 
+static bool seedDatabase(QString *errorMessage) {
+  QSqlDatabase db = QSqlDatabase::database("app_sqlite");
+  if (!db.isOpen()) {
+    if (errorMessage)
+      *errorMessage = "Database not open";
+    return false;
+  }
+
+  QSqlQuery query(db);
+
+  // 1. 确保 "指挥中心" 单位存在
+  qint64 unitId = 0;
+  query.prepare("SELECT id FROM units WHERE name = ?");
+  query.addBindValue("指挥中心");
+  if (query.exec() && query.next()) {
+    unitId = query.value(0).toLongLong();
+  } else {
+    query.prepare("INSERT INTO units (name) VALUES (?)");
+    query.addBindValue("指挥中心");
+    if (!query.exec()) {
+      if (errorMessage)
+        *errorMessage = "Failed to seed unit: " + query.lastError().text();
+      return false;
+    }
+    unitId = query.lastInsertId().toLongLong();
+  }
+
+  // 2. 确保 "admin" (指挥调度员) 存在
+  qint64 dispatcherId = 0;
+  query.prepare("SELECT id FROM users WHERE username = ?");
+  query.addBindValue("admin");
+  if (query.exec() && query.next()) {
+    dispatcherId = query.value(0).toLongLong();
+  } else {
+    query.prepare(
+        "INSERT INTO users (username, password, phone, role, unit_id, unit) "
+        "VALUES (?, ?, ?, ?, ?, ?)");
+    query.addBindValue("admin");
+    query.addBindValue("123456"); // verifyPassword 允许明文
+    query.addBindValue("13800000000");
+    query.addBindValue("指挥调度员");
+    query.addBindValue(unitId);
+    query.addBindValue("指挥中心");
+    if (!query.exec()) {
+      if (errorMessage)
+        *errorMessage = "Failed to seed admin: " + query.lastError().text();
+      return false;
+    }
+    dispatcherId = query.lastInsertId().toLongLong();
+  }
+
+  // 3. 确保 "handler1" (现场处置员) 存在
+  query.prepare("SELECT id FROM users WHERE username = ?");
+  query.addBindValue("handler1");
+  if (!query.exec() || !query.next()) {
+    query.prepare("INSERT INTO users (username, password, phone, role, "
+                  "unit_id, unit, dispatcher_user_id) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?)");
+    query.addBindValue("handler1");
+    query.addBindValue("123456");
+    query.addBindValue("13900000000");
+    query.addBindValue("现场处置员");
+    query.addBindValue(unitId);
+    query.addBindValue("指挥中心");
+    query.addBindValue(dispatcherId);
+    if (!query.exec()) {
+      if (errorMessage)
+        *errorMessage = "Failed to seed handler: " + query.lastError().text();
+      return false;
+    }
+  }
+
+  // 4. 确保至少存在一条未指派的灾害记录
+  query.prepare("SELECT COUNT(*) FROM disasters");
+  if (query.exec() && query.next() && query.value(0).toInt() == 0) {
+    query.prepare("INSERT INTO disasters (disaster_type, location, "
+                  "occurred_at, content, severity, dispatcher_id) "
+                  "VALUES (?, ?, ?, ?, ?, ?)");
+    query.addBindValue("火灾");
+    query.addBindValue("市中心广场");
+    query.addBindValue(
+        QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"));
+    query.addBindValue("市中心广场发生火灾，需要紧急支援");
+    query.addBindValue(5);
+    query.addBindValue(dispatcherId);
+    if (!query.exec()) {
+      if (errorMessage)
+        *errorMessage = "Failed to seed disaster: " + query.lastError().text();
+      return false;
+    }
+  }
+
+  return true;
+}
+
 static QString findUpwardsFile(const QString &relativePathFromBase, int maxUp) {
   QDir dir(QCoreApplication::applicationDirPath());
   for (int i = 0; i <= maxUp; ++i) {
@@ -417,6 +513,10 @@ int main(int argc, char *argv[]) {
     QString dbError;
     if (!initSqliteSchema(&dbError)) {
       QMessageBox::critical(nullptr, "数据库初始化失败", dbError);
+      return -1;
+    }
+    if (!seedDatabase(&dbError)) {
+      QMessageBox::critical(nullptr, "数据库初始化数据失败", dbError);
       return -1;
     }
   }

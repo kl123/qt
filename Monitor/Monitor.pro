@@ -34,15 +34,15 @@ SOURCES += \
     monitorconfig.cpp \
     ocrhelper.cpp \
     overview.cpp \
-    userauth.cpp \
-    third_party/RapidOcrOnnx/src/AngleNet.cpp \
-    third_party/RapidOcrOnnx/src/CrnnNet.cpp \
-    third_party/RapidOcrOnnx/src/DbNet.cpp \
-    third_party/RapidOcrOnnx/src/OcrLite.cpp \
-    third_party/RapidOcrOnnx/src/OcrLiteImpl.cpp \
-    third_party/RapidOcrOnnx/src/OcrResultUtils.cpp \
-    third_party/RapidOcrOnnx/src/OcrUtils.cpp \
-    third_party/RapidOcrOnnx/src/clipper.cpp
+    userauth.cpp
+    # third_party/RapidOcrOnnx/src/AngleNet.cpp \
+    # third_party/RapidOcrOnnx/src/CrnnNet.cpp \
+    # third_party/RapidOcrOnnx/src/DbNet.cpp \
+    # third_party/RapidOcrOnnx/src/OcrLite.cpp \
+    # third_party/RapidOcrOnnx/src/OcrLiteImpl.cpp \
+    # third_party/RapidOcrOnnx/src/OcrResultUtils.cpp \
+    # third_party/RapidOcrOnnx/src/OcrUtils.cpp \
+    # third_party/RapidOcrOnnx/src/clipper.cpp
 
 HEADERS += \
     disasteranalyzer.h \
@@ -77,12 +77,11 @@ INCLUDEPATH += $$OPENCV_DIR/include
 # ✅ 链接 MinGW 的 .a 静态库（注意名字要匹配！）
 QMAKE_LIBS += $$OPENCV_DIR/libopencv_world450.dll.a
 
-# === RapidOCR(Onnx) 设置 ===
-RAPIDOCR_DIR = $$PWD/third_party/RapidOcrOnnx
-ONNXRUNTIME_DIR = $$PWD/asset/onnxruntime-win-x64-1.15.1
-
-INCLUDEPATH += $$RAPIDOCR_DIR/include
-INCLUDEPATH += $$ONNXRUNTIME_DIR/include
+# === RapidOCR(Onnx) 设置 (移除: 源码丢失，改为使用 Tesseract exe) ===
+# RAPIDOCR_DIR = $$PWD/third_party/RapidOcrOnnx
+# ONNXRUNTIME_DIR = $$PWD/asset/onnxruntime-win-x64-1.15.1
+# INCLUDEPATH += $$RAPIDOCR_DIR/include
+# INCLUDEPATH += $$ONNXRUNTIME_DIR/include
 
 # ✅ 自动复制 DLL 到输出目录（Windows）
 win32 {
@@ -95,8 +94,8 @@ win32 {
     isEmpty(TARGET_DIR): TARGET_DIR = $$OUT_PWD
 
     OPENCV_DLLS = libopencv_world450.dll
-    ONNXRUNTIME_BIN = $$ONNXRUNTIME_DIR/lib
-    ONNXRUNTIME_DLLS = onnxruntime.dll onnxruntime_providers_shared.dll
+    # ONNXRUNTIME_BIN = $$ONNXRUNTIME_DIR/lib
+    # ONNXRUNTIME_DLLS = onnxruntime.dll onnxruntime_providers_shared.dll
 
     for(dll, OPENCV_DLLS) {
         dll_source = $$shell_path($$OPENCV_BIN/$$dll)
@@ -104,11 +103,11 @@ win32 {
         QMAKE_POST_LINK += $$QMAKE_COPY \"$$dll_source\" \"$$dll_dest\" $$escape_expand(\\n\\t)
     }
 
-    for(dll, ONNXRUNTIME_DLLS) {
-        dll_source = $$shell_path($$ONNXRUNTIME_BIN/$$dll)
-        dll_dest = $$shell_path($$TARGET_DIR/$$dll)
-        QMAKE_POST_LINK += $$QMAKE_COPY \"$$dll_source\" \"$$dll_dest\" $$escape_expand(\\n\\t)
-    }
+    # for(dll, ONNXRUNTIME_DLLS) {
+    #     dll_source = $$shell_path($$ONNXRUNTIME_BIN/$$dll)
+    #     dll_dest = $$shell_path($$TARGET_DIR/$$dll)
+    #     QMAKE_POST_LINK += $$QMAKE_COPY \"$$dll_source\" \"$$dll_dest\" $$escape_expand(\\n\\t)
+    # }
 }
 
 RESOURCES += \

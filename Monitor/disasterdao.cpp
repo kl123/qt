@@ -491,7 +491,7 @@ bool DisasterDao::queryDisasters(const DisasterQuery &queryModel,
 }
 
 bool DisasterDao::getUnassignedDisastersByDispatcher(
-    qint64 dispatcherId, qint64 /*unitId*/, int limit, int offset,
+    qint64 dispatcherId, int limit, int offset,
     QList<DisasterRecord> *records, QString *errorMessage) {
   QString connError;
   if (!ensureSqliteConnection(&connError)) {
