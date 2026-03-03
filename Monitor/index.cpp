@@ -4,6 +4,7 @@
 #include <QUrl>
 
 #include "monitorconfig.h"
+#include "overview.h"
 
 index::index(QWidget *parent) : QMainWindow(parent)
 {
@@ -79,6 +80,11 @@ void index::setupTopNav()
         dialog.exec();
     });
 
+    connect(btnFireAlarm,&QPushButton::clicked, [=](){
+        overview *w = new overview();
+        w->setAttribute(Qt::WA_DeleteOnClose);
+        w->show();
+    }               );
     QList<QPushButton*> navBtns = {btnRealTime, btnFireAlarm, btnElecFire, btnNational, btnConfig};
     for (auto btn : navBtns) {
         btn->setMinimumSize(160, 50); // 减小按钮宽度，更紧凑
