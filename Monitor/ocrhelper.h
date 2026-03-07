@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <opencv2/opencv.hpp>
+#include "OcrLite.h"
 
 /**
  * @brief OCR 文字识别助手类
@@ -31,6 +32,9 @@ public:
     QString extractNewMessage(const QString &oldText, const QString &newText);
 
 private:
+    OcrLite *ocrEngine;
+    bool isOcrInitialized;
+
     /**
      * @brief OCR 预处理
      * 对图像进行二值化、去噪等处理以提高识别率

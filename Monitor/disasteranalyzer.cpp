@@ -1,7 +1,8 @@
 #include "disasteranalyzer.h"
 #include <QDebug>
 #include <QMap>
-
+#include <QSslSocket>
+#include <QSslError>
 DisasterAnalyzer::DisasterAnalyzer(QObject *parent)
     : QObject(parent), m_aiEnabled(false)
 {
@@ -107,11 +108,23 @@ DisasterRecord DisasterAnalyzer::analyzeWithAi(const QString& text)
     jsonBody["messages"] = messages;
     jsonBody["temperature"] = 0.1; // 低温度以获得确定性结果
 
+    // 检查 SSL 支持
+    if (!QSslSocket::supportsSsl()) {
+        qDebug() << "警告: 此环境不支持 SSL/HTTPS，AI 请求大概率会失败。版本:" << QSslSocket::sslLibraryBuildVersionString();
+    }
+
     // 发送请求（同步等待）
     QNetworkReply *reply = manager.post(request, QJsonDocument(jsonBody).toJson());
     
     QEventLoop loop;
     connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    connect(reply, QOverload<const QList<QSslError>&>::of(&QNetworkReply::sslErrors), [reply](const QList<QSslError> &errors) {
+        for (const QSslError &e : errors) {
+            qDebug() << "AI 请求 SSL 错误:" << e.errorString();
+        }
+        // 尝试忽略 SSL 错误以便继续
+        reply->ignoreSslErrors();
+    });
     loop.exec();
 
     if (reply->error() == QNetworkReply::NoError) {

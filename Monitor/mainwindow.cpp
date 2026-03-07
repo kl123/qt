@@ -16,6 +16,7 @@
 #include <QString>
 #include <QTimer>
 #include <iostream>
+#include <QSplitter>
 #include <opencv2/opencv.hpp>
 
 MainWindow::MainWindow(QWidget *parent)
@@ -27,6 +28,7 @@ MainWindow::MainWindow(QWidget *parent)
       configButton(new QPushButton("参数配置", this)), timer(new QTimer(this)),
       testAlertButton(new QPushButton("测试警告", this)),
       viewHistoryButton(new QPushButton("查看历史", this)),
+      viewDbHistoryButton(new QPushButton("查看入库消息", this)),
       continuousDetectButton(new QPushButton("模式2:屏幕变化检测", this)),
       continuousTimer(new QTimer(this)), isContinuousDetecting(false) {
   std::cout << "OpenCV version: " << CV_VERSION << std::endl;
@@ -49,7 +51,7 @@ MainWindow::MainWindow(QWidget *parent)
 
   logTextEdit->setReadOnly(true);
   logTextEdit->setPlaceholderText("OCR 识别结果将显示在这里...");
-  logTextEdit->setMaximumHeight(150);
+  logTextEdit->setMinimumHeight(100);
   logTextEdit->setStyleSheet("QTextEdit { background-color: #eee; color: #333; "
                              "font-family: Consolas, Monospace; }");
 
@@ -63,6 +65,8 @@ MainWindow::MainWindow(QWidget *parent)
           &MainWindow::onTestAlert);
   connect(viewHistoryButton, &QPushButton::clicked, this,
           &MainWindow::onViewHistory);
+  connect(viewDbHistoryButton, &QPushButton::clicked, this,
+          &MainWindow::onViewDbHistory);
   connect(continuousDetectButton, &QPushButton::clicked, this,
           &MainWindow::mode2);
   connect(continuousTimer, &QTimer::timeout, this,
@@ -81,17 +85,26 @@ MainWindow::MainWindow(QWidget *parent)
   auxButtonLayout->addWidget(configButton);
   auxButtonLayout->addWidget(testAlertButton);
   auxButtonLayout->addWidget(viewHistoryButton);
+  auxButtonLayout->addWidget(viewDbHistoryButton);
   auxButtonLayout->addStretch();
 
   QVBoxLayout *buttonLayout = new QVBoxLayout;
   buttonLayout->addLayout(modeButtonLayout);
   buttonLayout->addLayout(auxButtonLayout);
 
-  // 主布局
+  // 主布局：使用可调大小的 QSplitter
+  QSplitter *splitter = new QSplitter(Qt::Vertical, this);
+  splitter->addWidget(imageLabel);
+  splitter->addWidget(croppedLabel);
+  splitter->addWidget(logTextEdit);
+  
+  // 设置默认拉伸比例（例：2:2:1）
+  splitter->setStretchFactor(0, 2);
+  splitter->setStretchFactor(1, 2);
+  splitter->setStretchFactor(2, 1);
+  
   QVBoxLayout *mainLayout = new QVBoxLayout;
-  mainLayout->addWidget(imageLabel);
-  mainLayout->addWidget(croppedLabel);
-  mainLayout->addWidget(logTextEdit);
+  mainLayout->addWidget(splitter);
   mainLayout->addLayout(buttonLayout);
 
   QWidget *centralWidget = new QWidget(this);
@@ -442,6 +455,37 @@ void MainWindow::onViewHistory() {
   logTextEdit->moveCursor(QTextCursor::End);
 }
 
+void MainWindow::onViewDbHistory() {
+  logTextEdit->append("<b>===== 灾害入库记录 =====</b>");
+  
+  DisasterQuery q;
+  q.orderBy = DisasterQuery::OrderBy::OccurredAtDesc; // 按发生时间倒序
+  
+  QList<DisasterRecord> records;
+  QString err;
+  if (DisasterDao::queryDisasters(q, &records, &err)) {
+    if (records.isEmpty()) {
+        logTextEdit->append("<i>(暂无任何入库记录)</i>");
+    } else {
+        for (const auto &record : records) {
+          logTextEdit->append(QString("<b>[%1] %2</b> (等级: %3) ID: %4")
+                                  .arg(record.occurredAt)
+                                  .arg(record.disasterType)
+                                  .arg(record.severity)
+                                  .arg(record.id));
+          logTextEdit->append(QString(" - 地点: %1").arg(record.location));
+          logTextEdit->append(QString(" - 详情: %1").arg(record.content));
+          logTextEdit->append("------------------------");
+        }
+    }
+  } else {
+    logTextEdit->append(QString("<font color='red'>查询数据库失败: %1</font>").arg(err));
+  }
+  
+  logTextEdit->append("<b>========================</b>");
+  logTextEdit->moveCursor(QTextCursor::End);
+}
+
 // 连续检测的捕获逻辑：限定区域检测变化
 void MainWindow::onContinuousCapture() {
   QScreen *screen = QGuiApplication::primaryScreen();
@@ -766,8 +810,15 @@ void MainWindow::newOCR() {
         if (DisasterDao::createDisaster(rec, &id, &err)) {
           qDebug() << "灾害记录创建成功，ID:" << id
                    << " 类型:" << rec.disasterType;
+          logTextEdit->append(
+              QString("<font color='green'><b>[AI 分析结果] 成功入库，ID: %1</b></font>").arg(id));
+          logTextEdit->append(QString(" - <b>灾害类型：</b>%1").arg(rec.disasterType));
+          logTextEdit->append(QString(" - <b>具体地点：</b>%1").arg(rec.location));
+          logTextEdit->append(QString(" - <b>严重等级：</b>%1 级").arg(rec.severity));
+          logTextEdit->append(QString(" - <b>发生时间：</b>%1").arg(rec.occurredAt));
         } else {
           qDebug() << "创建失败:" << err;
+          logTextEdit->append(QString("<font color='red'><b>[系统操作] 灾害入库失败: %1</b></font>").arg(err));
         }
       }
 

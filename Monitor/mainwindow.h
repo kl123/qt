@@ -41,6 +41,7 @@ private slots:
     cv::Mat detectAndCaptureChanges(const cv::Mat &currentFrame);
     void onTestAlert();
     void onViewHistory();
+    void onViewDbHistory();
     void onContinuousDetect();
     void onContinuousCapture();
     void stopAllMonitoring();
@@ -71,6 +72,7 @@ private:
 
     QPushButton* testAlertButton;
     QPushButton* viewHistoryButton;
+    QPushButton* viewDbHistoryButton;
 
     QPushButton *continuousDetectButton = nullptr;
     QTimer *continuousTimer = nullptr;

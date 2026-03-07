@@ -3,8 +3,6 @@
 #include <QDebug>
 #include <QCoreApplication>
 #include <QFileInfo>
-#include <QProcess>
-#include <QTemporaryFile>
 #include <QFile>
 
 // 辅助函数：查找目录
@@ -24,6 +22,7 @@ static QString findDirWithChild(const QString& startDir, const QString& childDir
 
 static QString findAssetDir() {
     const QString start = QCoreApplication::applicationDirPath();
+    // 向上查找包含 asset 的目录
     const QString base = findDirWithChild(start, "asset", 6);
     if (base.isEmpty()) {
         return QString();
@@ -31,12 +30,63 @@ static QString findAssetDir() {
     return QDir(base).filePath("asset");
 }
 
-OcrHelper::OcrHelper()
+OcrHelper::OcrHelper() : ocrEngine(nullptr), isOcrInitialized(false)
 {
+    QString assetDir = findAssetDir();
+    if (assetDir.isEmpty()) {
+        qDebug() << "Asset dir not found for RapidOCR";
+        return;
+    }
+
+    QString rapidOcrDir = QDir(assetDir).filePath("RapidOCR");
+    QString modelsDir = QDir(rapidOcrDir).filePath("models");
+
+    // 检查模型文件是否存在
+    QString detFile = QDir(modelsDir).filePath("ch_PP-OCRv3_det_infer.onnx");
+    QString clsFile = QDir(modelsDir).filePath("ch_ppocr_mobile_v2.0_cls_infer.onnx");
+    QString recFile = QDir(modelsDir).filePath("ch_PP-OCRv3_rec_infer.onnx");
+    QString keysFile = QDir(modelsDir).filePath("ppocr_keys_v1.txt");
+
+    if (!QFileInfo::exists(detFile) || !QFileInfo::exists(clsFile) || 
+        !QFileInfo::exists(recFile) || !QFileInfo::exists(keysFile)) {
+        qDebug() << "RapidOCR models missing in:" << modelsDir;
+        return;
+    }
+
+    std::string detPath = detFile.toStdString();
+    std::string clsPath = clsFile.toStdString();
+    std::string recPath = recFile.toStdString();
+    std::string keysPath = keysFile.toStdString();
+
+    try {
+        ocrEngine = new OcrLite();
+        ocrEngine->setNumThread(4);
+        ocrEngine->initLogger(false, false, false);
+        
+        bool ret = ocrEngine->initModels(detPath, clsPath, recPath, keysPath);
+        if (!ret) {
+            qDebug() << "Failed to init RapidOCR models";
+            delete ocrEngine;
+            ocrEngine = nullptr;
+        } else {
+            isOcrInitialized = true;
+            qDebug() << "RapidOCR initialized successfully";
+        }
+    } catch (const std::exception& e) {
+        qDebug() << "Exception during RapidOCR init:" << e.what();
+        if (ocrEngine) {
+            delete ocrEngine;
+            ocrEngine = nullptr;
+        }
+    }
 }
 
 OcrHelper::~OcrHelper()
 {
+    if (ocrEngine) {
+        delete ocrEngine;
+        ocrEngine = nullptr;
+    }
 }
 
 cv::Mat OcrHelper::preprocessImageForOCR(const cv::Mat &input)
@@ -52,6 +102,7 @@ cv::Mat OcrHelper::preprocessImageForOCR(const cv::Mat &input)
     }
 
     // 调整大小，放大2倍以提高识别率
+    // RapidOCR 也可以处理小图，但放大通常有助于识别小字
     cv::resize(processed, processed, cv::Size(), 2.0, 2.0, cv::INTER_CUBIC);
 
     // 锐化
@@ -70,58 +121,33 @@ QString OcrHelper::recognizeText(const cv::Mat &image)
         return QString();
     }
 
+    if (!isOcrInitialized || !ocrEngine) {
+        qDebug() << "OCR engine not initialized, cannot recognize text";
+        return QString();
+    }
+
     cv::Mat processedImg = preprocessImageForOCR(image);
 
-    // 1. 保存图片到临时文件
-    QString tempImgPath = QDir::temp().filePath("monitor_ocr_temp.png");
-    if (!cv::imwrite(tempImgPath.toStdString(), processedImg)) {
-        qDebug() << "Failed to save temp image for OCR";
+    // RapidOCR 参数
+    int padding = 50;
+    int maxSideLen = 1024;
+    float boxScoreThresh = 0.5f;
+    float boxThresh = 0.3f;
+    float unClipRatio = 1.6f;
+    bool doAngle = true;
+    bool mostAngle = true;
+
+    try {
+        OcrResult result = ocrEngine->detect(processedImg, padding, maxSideLen, 
+                                            boxScoreThresh, boxThresh, unClipRatio, 
+                                            doAngle, mostAngle);
+        
+        // 简单返回所有识别到的文本
+        return QString::fromStdString(result.strRes);
+    } catch (const std::exception& e) {
+        qDebug() << "Exception during OCR detection:" << e.what();
         return QString();
     }
-
-    // 2. 查找 Tesseract 可执行文件
-    QString assetDir = findAssetDir();
-    if (assetDir.isEmpty()) {
-        qDebug() << "Asset dir not found";
-        return QString();
-    }
-    QString tesseractExe = QDir(assetDir).filePath("Tesseract-OCR/tesseract.exe");
-    QString tessDataDir = QDir(assetDir).filePath("Tesseract-OCR/tessdata");
-
-    if (!QFileInfo(tesseractExe).exists()) {
-        qDebug() << "Tesseract exe not found at:" << tesseractExe;
-        return QString();
-    }
-
-    // 3. 调用 Tesseract
-    QProcess process;
-    // 设置 TESSDATA_PREFIX 环境变量
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    env.insert("TESSDATA_PREFIX", tessDataDir);
-    process.setProcessEnvironment(env);
-
-    QStringList args;
-    args << tempImgPath << "stdout" << "-l" << "chi_sim+eng";
-
-    process.start(tesseractExe, args);
-    if (!process.waitForFinished(10000)) { // 等待最多10秒
-        qDebug() << "Tesseract process timed out or failed";
-        return QString();
-    }
-
-    QByteArray output = process.readAllStandardOutput();
-    QByteArray error = process.readAllStandardError();
-
-    if (!error.isEmpty()) {
-        // Tesseract 输出很多 info 到 stderr，不一定是错误
-        // qDebug() << "Tesseract stderr:" << error;
-    }
-
-    // 清理临时文件
-    QFile::remove(tempImgPath);
-
-    QString result = QString::fromUtf8(output).trimmed();
-    return result;
 }
 
 QString OcrHelper::extractNewMessage(const QString &oldText, const QString &newText)
