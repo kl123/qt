@@ -10,14 +10,6 @@ release/monitorconfig.o
 release/ocrhelper.o
 release/overview.o
 release/userauth.o
-release/AngleNet.o
-release/CrnnNet.o
-release/DbNet.o
-release/OcrLite.o
-release/OcrLiteImpl.o
-release/OcrResultUtils.o
-release/OcrUtils.o
-release/clipper.o
 release/qrc_audio.o
 release/moc_disasteranalyzer.o
 release/moc_fuzhu.o

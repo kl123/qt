@@ -176,7 +176,7 @@ void overview::InitialData(){
     QString err;
 
     // 执行查询
-    bool querySuccess = DisasterDao::getUnassignedDisastersByDispatcher(userId, 1, 50, 0, &unassigned, &err);
+    bool querySuccess = DisasterDao::getUnassignedDisastersByDispatcher(userId, 50, 0, &unassigned, &err);
 
     // ========== 核心：打印 QList<DisasterRecord> 完整内容 ==========
     qDebug() << "===== QList<DisasterRecord> 内容 ======";
