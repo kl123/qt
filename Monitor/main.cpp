@@ -20,6 +20,7 @@
 #include <opencv2/opencv.hpp>
 
 static bool initSqliteSchema(QString *errorMessage) {
+
   const QString dbPath =
       QDir(QCoreApplication::applicationDirPath()).filePath("monitor.db");
 

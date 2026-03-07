@@ -6,6 +6,7 @@
 #include "monitorconfig.h"
 #include "ocrhelper.h"
 #include "userauth.h"
+#include "aianalysisdialog.h" // 引入新弹窗
 #include <QDebug>
 #include <QDir>
 #include <QGuiApplication>
@@ -799,10 +800,34 @@ void MainWindow::newOCR() {
         analyzer.setAiEnabled(aiEnabled);
         analyzer.setAiConfig(aiUrl, aiKey, aiModel);
 
+        // 创建并显示 AI 分析弹窗
+        AiAnalysisDialog *aiDialog = new AiAnalysisDialog(this);
+        // 连接 analyzer 的日志信号到弹窗
+        connect(&analyzer, &DisasterAnalyzer::log, aiDialog, &AiAnalysisDialog::appendLog);
+        
+        // 使用非模态显示，并自动删除（或者手动管理生命周期）
+        // 因为 analyze 是同步阻塞调用，所以我们可以先 show，然后在 analyze 返回后不做特殊处理，让用户手动关闭
+        // 或者我们使用模态 exec() 并在 analyze 完成后自动关闭？
+        // 这里的需求是“输出过程”，所以最好是非模态，允许用户看。
+        aiDialog->show();
+        
+        // 为了让弹窗先显示出来，处理一下事件
+        QCoreApplication::processEvents();
+
         logTextEdit->append(
             "<font color='blue'><b>[AI] 正在进行智能分析...</b></font>");
         DisasterRecord rec = analyzer.analyze(newText);
         rec.dispatcherId = UserAuth::currentUser.id; // 关联当前登录的指挥调度员
+        
+        // 分析完成后，可以追加一条完成日志
+        aiDialog->appendLog("\n✅ 分析流程结束。");
+
+        // 如果 AI 返回的是空记录（表示非灾害），则不进行入库
+        if (rec.disasterType.isEmpty() && rec.location.isEmpty()) {
+             logTextEdit->append(
+                "<font color='gray'><b>[AI] 判定为非灾害信息，已忽略。</b></font>");
+             return;
+        }
 
         qint64 id;
         QString err;

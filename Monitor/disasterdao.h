@@ -18,6 +18,7 @@ struct DisasterRecord {
   int severity = 0;        // 严重等级 (0为最低)
   qint64 dispatcherId = 0; // 关联的调度员ID
   QString createdAt;       // 创建时间
+  bool isDisaster = true;  // 是否确认为灾害（AI判定）
 };
 
 /**

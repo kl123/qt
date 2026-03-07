@@ -62,6 +62,10 @@ private:
     QString m_apiUrl;
     QString m_apiKey;
     QString m_aiModel;
+
+signals:
+    // 实时日志输出信号
+    void log(const QString &message);
 };
 
 #endif // DISASTERANALYZER_H

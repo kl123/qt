@@ -35,6 +35,7 @@ SOURCES += \
     ocrhelper.cpp \
     overview.cpp \
     userauth.cpp \
+    aianalysisdialog.cpp \
     third_party/RapidOcrOnnx/src/AngleNet.cpp \
     third_party/RapidOcrOnnx/src/CrnnNet.cpp \
     third_party/RapidOcrOnnx/src/DbNet.cpp \
@@ -55,7 +56,8 @@ HEADERS += \
     monitorconfig.h \
     ocrhelper.h \
     overview.h \
-    userauth.h
+    userauth.h \
+    aianalysisdialog.h
 
 FORMS += \
     fuzhu.ui \
