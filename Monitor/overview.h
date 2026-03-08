@@ -4,9 +4,15 @@
 #include <QDialog>
 #include <QTableWidget>
 #include <QVBoxLayout>
+#include <QPushButton>
+#include <QList>
+#include <QListWidget>      // 新增：用于多选列表
+#include <QLabel>           // 新增：用于提示文字
+#include <QMessageBox>      // 新增：用于弹窗
+#include "disasterdao.h"    // 确保这里包含了 DisasterRecord 的定义
+#include "userauth.h"       // 确保这里包含了 AuthUser 的定义
 
-
-// 定义灾情数据结构体，与数据库表字段一一对应
+// 定义灾情数据结构体 (保留用于兼容旧代码或假数据)
 struct DisasterInfo {
     int id;                 // 主键ID
     QString disaster_type;  // 灾害类型
@@ -35,11 +41,21 @@ private:
     QTableWidget *disasterTable;  // 灾情展示表格
     QVBoxLayout *mainLayout;      // 主布局
 
-    // 私有方法：初始化表格UI
+    // 私有方法
     void initTableUI();
-    // 私有方法：填充假数据
     void fillFakeData();
     void InitialData();
+    QWidget* createActionWidget(qint64 id);
+    void loadEmee();              // 加载员工信息
+
+    // 新增：辅助方法，用于执行指派逻辑（包含弹出多选框）
+    void performAssignTask(qint64 disasterId);
+
+private slots:
+    // 按钮点击槽函数
+    void onAssignClicked();
+    void onEditClicked();
+    void onDeleteClicked();
 };
 
 #endif // OVERVIEW_H
