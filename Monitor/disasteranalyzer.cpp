@@ -112,11 +112,11 @@ DisasterRecord DisasterAnalyzer::analyzeWithAi(const QString& text)
                                "{\n"
                                "  \"isDisaster\": true/false, // 核心判断：这是否是一条关于灾害、事故或紧急情况的信息？\n"
                                "  \"disasterType\": \"灾害类型（如地震、火灾、洪水、交通事故等，若不是灾害则留空）\",\n"
-                               "  \"location\": \"具体地点（若无法确定则为'未知地点'）\",\n"
+                               "  \"location\": \"提取文本中发生灾害的具体物理地点地址（必须尽可能详细，如包含省市区或标志性建筑物），若文本中未提及任何位置则为'未知地点'\",\n"
                                "  \"severity\": 3, // 严重等级（1-10的整数，1为轻微，10为毁灭性，默认3）\n"
                                "  \"occurredAt\": \"YYYY-MM-DD HH:mm:ss\" // 发生时间（若未提及则留空）\n"
                                "}\n"
-                               "注意：日常聊天、无意义文本、或者明显非灾害的内容（如'我已经在路上了'、'去吃饭'），请将 isDisaster 设为 false。\n"
+                               "注意：日常聊天、无意义文本、或者明显非灾害的内容（如'我已经在路上了'、'去吃饭'），请务必将 isDisaster 设为 false。\n"
                                "仅返回JSON对象，不要包含Markdown标记或其他解释。";
 
     QJsonObject userMessage;
@@ -199,7 +199,9 @@ DisasterRecord DisasterAnalyzer::analyzeWithAi(const QString& text)
                                   qDebug() << "AI 判定为非灾害信息:" << content;
                                   emit log("⚖️ AI 判定结果：【非灾害信息】");
                                   emit log("ℹ️ 忽略此条消息，不进行入库处理。");
-                                  return DisasterRecord(); // 返回空对象，表示无需处理
+                                  DisasterRecord emptyRec;
+                                  emptyRec.isDisaster = false;
+                                  return emptyRec; // 返回对象并标记为非灾害
                               }
                               
                               emit log("⚖️ AI 判定结果：【⚠️ 确认灾害/紧急事件】");
@@ -245,7 +247,9 @@ DisasterRecord DisasterAnalyzer::analyzeWithAi(const QString& text)
         }
         
         // curl 也失败了，或者无法启动，回退到空
-        return DisasterRecord(); 
+        DisasterRecord errorRec;
+        errorRec.isDisaster = false;
+        return errorRec; 
     }
 
     // 发送请求（同步等待）
@@ -293,7 +297,9 @@ DisasterRecord DisasterAnalyzer::analyzeWithAi(const QString& text)
                         qDebug() << "AI 判定为非灾害信息:" << content;
                         emit log("⚖️ AI 判定结果：【非灾害信息】");
                         emit log("ℹ️ 忽略此条消息，不进行入库处理。");
-                        return DisasterRecord(); // 返回空对象
+                        DisasterRecord emptyRec;
+                        emptyRec.isDisaster = false;
+                        return emptyRec; // 返回对象并显式标记为非灾害
                     }
                     
                     emit log("⚖️ AI 判定结果：【⚠️ 确认灾害/紧急事件】");
@@ -336,7 +342,9 @@ DisasterRecord DisasterAnalyzer::analyzeWithAi(const QString& text)
     }
 
     reply->deleteLater();
-    return DisasterRecord(); // 返回空记录表示失败
+    DisasterRecord errorRec;
+    errorRec.isDisaster = false;
+    return errorRec; // 返回空记录表示失败
 }
 
 QString DisasterAnalyzer::preprocess(const QString& text)

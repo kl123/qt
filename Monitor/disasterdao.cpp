@@ -676,9 +676,11 @@ bool DisasterDao::getTasksForDisaster(qint64 disasterId,
 
   QSqlQuery query(db);
   query.prepare("SELECT t.id, t.disaster_id, t.handler_user_id, t.progress, "
-                "t.assigned_at, u.username, u.phone "
+                "t.assigned_at, u.username, u.phone, "
+                "d.disaster_type, d.location, d.severity "
                 "FROM disaster_tasks t "
                 "LEFT JOIN users u ON t.handler_user_id = u.id "
+                "LEFT JOIN disasters d ON t.disaster_id = d.id "
                 "WHERE t.disaster_id = ? "
                 "ORDER BY t.assigned_at DESC;");
   query.addBindValue(disasterId);
@@ -699,6 +701,9 @@ bool DisasterDao::getTasksForDisaster(qint64 disasterId,
       r.assignedAt = query.value(4).toString();
       r.handlerName = query.value(5).toString();
       r.handlerPhone = query.value(6).toString();
+      r.disasterType = query.value(7).toString();
+      r.location = query.value(8).toString();
+      r.severity = query.value(9).toInt();
       tasks->push_back(r);
     }
   }
@@ -801,3 +806,74 @@ bool DisasterDao::deleteDisasterTask(qint64 taskId, QString *errorMessage) {
 
   return true;
 }
+
+bool DisasterDao::getTasksForUser(qint64 userId, const QString& role, int limit, int offset, QList<DisasterTaskRecord> *tasks, QString *errorMessage) {
+  if (userId <= 0) {
+    if (errorMessage) *errorMessage = QStringLiteral("无效的用户ID");
+    return false;
+  }
+
+  QString connError;
+  if (!ensureSqliteConnection(&connError)) {
+    if (errorMessage) *errorMessage = connError;
+    return false;
+  }
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
+
+  if (tasks) {
+    tasks->clear();
+  }
+
+  if (limit <= 0) limit = 100;
+  if (limit > 500) limit = 500;
+  if (offset < 0) offset = 0;
+
+  QSqlQuery query(db);
+  QString sql = "SELECT t.id, t.disaster_id, t.handler_user_id, t.progress, "
+                "t.assigned_at, u.username, u.phone, "
+                "d.disaster_type, d.location, d.severity "
+                "FROM disaster_tasks t "
+                "LEFT JOIN users u ON t.handler_user_id = u.id "
+                "LEFT JOIN disasters d ON t.disaster_id = d.id ";
+
+  // 指挥调度员查询所有任务，普通处理人员只查询被指派给自己的任务
+  if (role != QStringLiteral("指挥调度员")) {
+      sql += "WHERE t.handler_user_id = ? ";
+  }
+
+  sql += "ORDER BY t.assigned_at DESC LIMIT ? OFFSET ?;";
+
+  query.prepare(sql);
+  
+  if (role != QStringLiteral("指挥调度员")) {
+      query.addBindValue(userId);
+  }
+  
+  query.addBindValue(limit);
+  query.addBindValue(offset);
+
+  if (!query.exec()) {
+    if (errorMessage) *errorMessage = query.lastError().text();
+    return false;
+  }
+
+  if (tasks) {
+    while (query.next()) {
+      DisasterTaskRecord r;
+      r.id = query.value(0).toLongLong();
+      r.disasterId = query.value(1).toLongLong();
+      r.handlerUserId = query.value(2).toLongLong();
+      r.progress = query.value(3).toInt();
+      r.assignedAt = query.value(4).toString();
+      r.handlerName = query.value(5).toString();
+      r.handlerPhone = query.value(6).toString();
+      r.disasterType = query.value(7).toString();
+      r.location = query.value(8).toString();
+      r.severity = query.value(9).toInt();
+      tasks->push_back(r);
+    }
+  }
+
+  return true;
+}
+

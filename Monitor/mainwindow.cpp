@@ -822,10 +822,10 @@ void MainWindow::newOCR() {
         // 分析完成后，可以追加一条完成日志
         aiDialog->appendLog("\n✅ 分析流程结束。");
 
-        // 如果 AI 返回的是空记录（表示非灾害），则不进行入库
-        if (rec.disasterType.isEmpty() && rec.location.isEmpty()) {
+        // 如果 AI 明确判定为非灾害，或返回的是空记录，则不进行入库
+        if (!rec.isDisaster || (rec.disasterType.isEmpty() && rec.location.isEmpty())) {
              logTextEdit->append(
-                "<font color='gray'><b>[AI] 判定为非灾害信息，已忽略。</b></font>");
+                "<font color='gray'><b>[AI] 判定为非灾害信息，已自动拦截，不进行后续预警或入库。</b></font>");
              return;
         }
 

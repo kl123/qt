@@ -64,6 +64,11 @@ struct DisasterTaskRecord {
   // 关联数据
   QString handlerName;  // 处置员姓名
   QString handlerPhone; // 处置员电话
+
+  // 关联的灾害详情数据（用于任务列表展示）
+  QString disasterType; // 灾害类型
+  QString location;     // 地点
+  int severity = 0;     // 严重程度
 };
 
 /**
@@ -170,6 +175,19 @@ public:
    * @return 删除成功返回 true，若任务不存在则返回 false 并填充错误说明
    */
   static bool deleteDisasterTask(qint64 taskId, QString *errorMessage);
+
+  /**
+   * @brief 根据用户角色获取对应的灾害任务列表
+   * @param userId 操作用户ID
+   * @param role 操作用户角色 ("指挥调度员" 可看全部，其他角色只能看自己的)
+   * @param limit 返回条数上限
+   * @param offset 分页偏移
+   * @param tasks 结果返回列表
+   * @param errorMessage 失败时的错误信息
+   * @return true 成功, false 失败
+   */
+  static bool getTasksForUser(qint64 userId, const QString& role, int limit, int offset, QList<DisasterTaskRecord> *tasks, QString *errorMessage);
+
 
   // 综合查询灾害记录
   static bool queryDisasters(const DisasterQuery &query,
