@@ -877,3 +877,126 @@ bool DisasterDao::getTasksForUser(qint64 userId, const QString& role, int limit,
   return true;
 }
 
+// === 数据统计接口实现 ===
+
+bool DisasterDao::getDisastersByDate(const QString &date,
+                                     QList<DisasterRecord> *records,
+                                     QString *errorMessage) {
+  const QString dateStr = date.trimmed();
+  if (dateStr.isEmpty()) {
+    if (errorMessage)
+      *errorMessage = QStringLiteral("日期不能为空，请传入格式为 YYYY-MM-DD 的日期字符串");
+    return false;
+  }
+
+  QString connError;
+  if (!ensureSqliteConnection(&connError)) {
+    if (errorMessage)
+      *errorMessage = connError;
+    return false;
+  }
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
+
+  QString schemaError;
+  if (!ensureDisasterSchema(db, &schemaError)) {
+    if (errorMessage)
+      *errorMessage = schemaError;
+    return false;
+  }
+
+  if (records)
+    records->clear();
+
+  // 固定使用 occurred_at（发生时间）进行日期匹配
+  const QString sql =
+      QString("SELECT id, disaster_type, location, occurred_at, content, "
+              "system_alarm_at, severity, dispatcher_id, created_at "
+              "FROM disasters "
+              "WHERE substr(occurred_at, 1, 10) = ? "
+              "ORDER BY occurred_at ASC;");
+
+  QSqlQuery query(db);
+  query.prepare(sql);
+  query.addBindValue(dateStr.left(10)); // 只取 YYYY-MM-DD 部分
+
+  if (!query.exec()) {
+    if (errorMessage)
+      *errorMessage = query.lastError().text();
+    return false;
+  }
+
+  if (records) {
+    while (query.next()) {
+      DisasterRecord r;
+      readDisasterRow(query, &r);
+      records->push_back(r);
+    }
+  }
+
+  return true;
+}
+
+bool DisasterDao::countDisasterTypesByDateRange(const QString &dateFrom,
+                                                const QString &dateTo,
+                                                QMap<QString, int> *result,
+                                                QString *errorMessage) {
+  const QString fromStr = dateFrom.trimmed();
+  const QString toStr   = dateTo.trimmed();
+
+  if (fromStr.isEmpty() || toStr.isEmpty()) {
+    if (errorMessage)
+      *errorMessage = QStringLiteral("起始日期和截止日期均不能为空");
+    return false;
+  }
+
+  QString connError;
+  if (!ensureSqliteConnection(&connError)) {
+    if (errorMessage)
+      *errorMessage = connError;
+    return false;
+  }
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
+
+  QString schemaError;
+  if (!ensureDisasterSchema(db, &schemaError)) {
+    if (errorMessage)
+      *errorMessage = schemaError;
+    return false;
+  }
+
+  if (result)
+    result->clear();
+
+  // 固定使用 occurred_at（发生时间），截止日期补全到当天末尾 23:59:59
+  const QString fromFull = fromStr.left(10) + QStringLiteral(" 00:00:00");
+  const QString toFull   = toStr.left(10)   + QStringLiteral(" 23:59:59");
+
+  const QString sql =
+      QStringLiteral("SELECT disaster_type, COUNT(*) AS cnt "
+                     "FROM disasters "
+                     "WHERE occurred_at >= ? AND occurred_at <= ? "
+                     "GROUP BY disaster_type "
+                     "ORDER BY cnt DESC;");
+
+  QSqlQuery query(db);
+  query.prepare(sql);
+  query.addBindValue(fromFull);
+  query.addBindValue(toFull);
+
+  if (!query.exec()) {
+    if (errorMessage)
+      *errorMessage = query.lastError().text();
+    return false;
+  }
+
+  if (result) {
+    while (query.next()) {
+      const QString type = query.value(0).toString();
+      const int     cnt  = query.value(1).toInt();
+      (*result)[type]    = cnt;
+    }
+  }
+
+  return true;
+}
+

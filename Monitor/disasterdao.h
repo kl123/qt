@@ -2,6 +2,7 @@
 #define DISASTERDAO_H
 
 #include <QtCore/QList>
+#include <QtCore/QMap>
 #include <QtCore/QString>
 
 /**
@@ -201,6 +202,34 @@ public:
       bool hasSeverityMax, int severityMax, const QString &occurredAtFrom,
       const QString &occurredAtTo, int limit, int offset,
       QList<DisasterRecord> *records, QString *errorMessage);
+
+  // === 数据统计接口 ===
+
+  /**
+   * @brief 根据指定日期查询当天发生或录入的灾害记录
+   * @param date          日期字符串，格式 "YYYY-MM-DD"
+   * @param useOccurredAt true=按发生时间(occurred_at)过滤，false=按创建时间(created_at)过滤
+   * @param records       结果列表
+   * @param errorMessage  失败时的详细错误描述输出
+   * @return 查询成功返回 true
+   */
+  static bool getDisastersByDate(const QString &date,
+                                 QList<DisasterRecord> *records,
+                                 QString *errorMessage);
+
+  /**
+   * @brief 按日期范围统计各灾害类型发生数量
+   * @param dateFrom      起始日期 "YYYY-MM-DD"（含）
+   * @param dateTo        截止日期 "YYYY-MM-DD"（含，自动补全至当天 23:59:59）
+   * @param useOccurredAt true=按发生时间统计，false=按创建时间统计
+   * @param result        统计结果，key=灾害类型名称，value=发生数量
+   * @param errorMessage  失败时的详细错误描述输出
+   * @return 统计成功返回 true
+   */
+  static bool countDisasterTypesByDateRange(const QString &dateFrom,
+                                            const QString &dateTo,
+                                            QMap<QString, int> *result,
+                                            QString *errorMessage);
 };
 
 #endif // DISASTERDAO_H
