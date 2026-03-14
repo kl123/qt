@@ -9,7 +9,9 @@ release/mainwindow.o
 release/monitorconfig.o
 release/ocrhelper.o
 release/overview.o
+release/task.o
 release/userauth.o
+release/aianalysisdialog.o
 release/AngleNet.o
 release/CrnnNet.o
 release/DbNet.o
@@ -26,3 +28,5 @@ release/moc_login.o
 release/moc_mainwindow.o
 release/moc_monitorconfig.o
 release/moc_overview.o
+release/moc_task.o
+release/moc_aianalysisdialog.o

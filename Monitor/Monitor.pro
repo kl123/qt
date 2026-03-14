@@ -34,6 +34,7 @@ SOURCES += \
     monitorconfig.cpp \
     ocrhelper.cpp \
     overview.cpp \
+    task.cpp \
     userauth.cpp \
     aianalysisdialog.cpp \
     third_party/RapidOcrOnnx/src/AngleNet.cpp \
@@ -56,6 +57,7 @@ HEADERS += \
     monitorconfig.h \
     ocrhelper.h \
     overview.h \
+    task.h \
     userauth.h \
     aianalysisdialog.h
 
@@ -65,7 +67,8 @@ FORMS += \
     login.ui \
     mainwindow.ui \
     monitorconfig.ui \
-    overview.ui
+    overview.ui \
+    task.ui
 
 QT += multimedia
 

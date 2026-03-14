@@ -614,16 +614,12 @@ void MainWindow::mode1() {
   bool hasDetectConfig =
       settings.contains("detectStartX") && settings.contains("detectWidth") &&
       settings.contains("detectStartY") && settings.contains("detectHeight");
-  // 卡片区域配置项（4个参数必须都存在）
-  bool hasCardConfig =
-      settings.contains("cardStartX") && settings.contains("cardWidth") &&
-      settings.contains("cardStartY") && settings.contains("cardHeight");
 
   // 3. 配置不完整则弹窗提示
-  if (!hasDetectConfig || !hasCardConfig) {
+  if (!hasDetectConfig) {
     QMessageBox::warning(this, "配置缺失",
                          "需要先进行区域选定！\n请点击「区域选定」按钮完成检测"
-                         "区域和卡片区域的框选。",
+                         "区域的框选。",
                          QMessageBox::Ok);
     logTextEdit->append(
         "<font color='red'><b>[模式1] "

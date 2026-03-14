@@ -34,9 +34,9 @@ private:
     // 顶部导航按钮
     QPushButton *btnRealTime;
     QPushButton *btnFireAlarm;
-    QPushButton *btnElecFire;
     QPushButton *btnNational;
     QPushButton *btnConfig; // 新增配置按钮
+    QPushButton *outbtn;
 
     // 顶部Logo和系统名称
     QFrame *logoFrame;

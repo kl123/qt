@@ -9,7 +9,9 @@ debug/mainwindow.o
 debug/monitorconfig.o
 debug/ocrhelper.o
 debug/overview.o
+debug/task.o
 debug/userauth.o
+debug/aianalysisdialog.o
 debug/AngleNet.o
 debug/CrnnNet.o
 debug/DbNet.o
@@ -26,3 +28,5 @@ debug/moc_login.o
 debug/moc_mainwindow.o
 debug/moc_monitorconfig.o
 debug/moc_overview.o
+debug/moc_task.o
+debug/moc_aianalysisdialog.o

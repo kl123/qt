@@ -5,6 +5,8 @@
 
 #include "monitorconfig.h"
 #include "overview.h"
+#include "task.h"
+#include "login.h"
 
 index::index(QWidget *parent) : QMainWindow(parent)
 {
@@ -64,9 +66,9 @@ void index::setupTopNav()
     // 顶部导航按钮（增大字体）
     btnRealTime = new QPushButton("▶ 实时概览");
     btnFireAlarm = new QPushButton("▶ 灾情总览");
-    btnElecFire = new QPushButton("▶ 任务指派");
-    btnNational = new QPushButton("▶ 我的任务");
-    btnConfig = new QPushButton("⚙ 系统设置");
+    btnNational = new QPushButton("▶ 任务中心");
+    btnConfig = new QPushButton("🛠️ 系统设置");
+    outbtn = new QPushButton("⚙️ 退出登录");
 
     // 连接信号槽
     connect(btnRealTime, &QPushButton::clicked, [=](){
@@ -84,8 +86,37 @@ void index::setupTopNav()
         overview *w = new overview();
         w->setAttribute(Qt::WA_DeleteOnClose);
         w->show();
-    }               );
-    QList<QPushButton*> navBtns = {btnRealTime, btnFireAlarm, btnElecFire, btnNational, btnConfig};
+    });
+
+    connect(btnNational,&QPushButton::clicked, [=](){
+        task *t = new task();
+        t->setAttribute(Qt::WA_DeleteOnClose);
+        t->show();
+    });
+
+    connect(outbtn,&QPushButton::clicked, [=](){
+        int ret = QMessageBox::question(this, "确认退出",
+                    "确定要退出登录吗？\n系统将关闭所有页面并返回登录界面。",
+                    QMessageBox::Yes | QMessageBox::No);
+
+                if (ret == QMessageBox::Yes) {
+                    // 2. (可选) 清除本地保存的用户信息，如 Cookie 或 QSettings
+                     QSettings settings("System", "disaster");
+                     settings.remove("userid");
+                     settings.remove("role");
+
+                    // 3. 获取登录窗口类的新实例
+                    Login *loginWnd = new Login();
+
+                    // 4. 显示登录窗口
+                    loginWnd->show();
+
+                    this->close();
+
+                }
+    });
+
+    QList<QPushButton*> navBtns = {btnRealTime, btnFireAlarm,  btnNational, btnConfig,outbtn};
     for (auto btn : navBtns) {
         btn->setMinimumSize(160, 50); // 减小按钮宽度，更紧凑
         btn->setFont(QFont("Microsoft YaHei", 14, QFont::Bold)); // 增大按钮字体
