@@ -6,23 +6,20 @@
 #include <QVBoxLayout>
 #include <QPushButton>
 #include <QList>
-#include <QListWidget>      // 新增：用于多选列表
-#include <QLabel>           // 新增：用于提示文字
-#include <QMessageBox>      // 新增：用于弹窗
-#include "disasterdao.h"    // 确保这里包含了 DisasterRecord 的定义
-#include "userauth.h"       // 确保这里包含了 AuthUser 的定义
+#include <QListWidget>
+#include <QLabel>
+#include <QMessageBox>
+#include <QLineEdit>
+#include <QComboBox>
+#include <QDateTimeEdit>
+#include <QSpinBox>
+#include <QFormLayout>
+#include <QHBoxLayout>
+#include <QTimer>
+#include <QSettings>
 
-// 定义灾情数据结构体 (保留用于兼容旧代码或假数据)
-struct DisasterInfo {
-    int id;                 // 主键ID
-    QString disaster_type;  // 灾害类型
-    QString location;       // 发生地点
-    QString occurred_at;    // 发生时间
-    QString content;        // 灾害详情
-    int severity;           // 严重程度（0-5，0为默认）
-    int dispatcher_id;      // 调度员ID（外键）
-    QString created_at;     // 记录创建时间
-};
+#include "disasterdao.h"    // 确保包含 DisasterRecord 定义
+#include "userauth.h"       // 确保包含 AuthUser 定义
 
 namespace Ui {
 class overview;
@@ -38,24 +35,32 @@ public:
 
 private:
     Ui::overview *ui;
-    QTableWidget *disasterTable;  // 灾情展示表格
-    QVBoxLayout *mainLayout;      // 主布局
+    QTableWidget *disasterTable;
+    QVBoxLayout *mainLayout;
 
-    // 私有方法
+    // UI 初始化与数据加载
     void initTableUI();
     void fillFakeData();
     void InitialData();
-    QWidget* createActionWidget(qint64 id);
-    void loadEmee();              // 加载员工信息
+    void refreshTable(); // 新增：刷新表格
 
-    // 新增：辅助方法，用于执行指派逻辑（包含弹出多选框）
+    // 辅助功能
+    QWidget* createActionWidget(qint64 id);
+    void loadEmee();
     void performAssignTask(qint64 disasterId);
 
+    // 核心业务逻辑
+    void addInfo(const DisasterRecord &record); // 修改：接收结构体参数
+    void addInfo(); // 保留无参版本以防旧代码调用，但内部不再使用硬编码
+
 private slots:
-    // 按钮点击槽函数
+    // 现有操作
     void onAssignClicked();
     void onEditClicked();
     void onDeleteClicked();
+
+    // 新增操作
+    void onAddDisasterClicked();
 };
 
 #endif // OVERVIEW_H

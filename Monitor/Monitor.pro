@@ -70,7 +70,7 @@ FORMS += \
     overview.ui \
     task.ui
 
-QT += multimedia
+QT += multimedia charts
 
 # === OpenCV 设置 ===
 OPENCV_DIR = $$PWD/asset/openCV-minGW
