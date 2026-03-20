@@ -623,6 +623,81 @@
   }
   ```
 
+#### 2.10 根据日期查询灾害
+
+- **接口定义**
+  ```cpp
+  static bool getDisastersByDate(const QString& date,
+                                 QList<DisasterRecord>* records, QString* errorMessage);
+  ```
+
+- **输入参数**
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| date | const QString& | 日期字符串，格式 `"YYYY-MM-DD"`，按 `occurred_at`（发生时间）过滤 |
+
+- **输出参数 / 返回值**
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| records | QList\<DisasterRecord\>* | 指定日期的灾害记录列表 |
+| errorMessage | QString* | 错误信息 |
+| (return) | bool | 成功返回 `true`，失败返回 `false` |
+
+- **调用示例**
+  ```cpp
+  QList<DisasterRecord> dayRecords;
+  QString err;
+  if (DisasterDao::getDisastersByDate("2025-03-14", &dayRecords, &err)) {
+      qDebug() << "当天记录数:" << dayRecords.size();
+      for (const auto& r : dayRecords) {
+          qDebug() << r.disasterType << r.location << r.occurredAt;
+      }
+  }
+  ```
+
+#### 2.11 按日期范围统计各灾害类型数量
+
+- **接口定义**
+  ```cpp
+  static bool countDisasterTypesByDateRange(const QString& dateFrom, const QString& dateTo,
+                                            QMap<QString, int>* result, QString* errorMessage);
+  ```
+
+- **输入参数**
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| dateFrom | const QString& | 起始日期，格式 `"YYYY-MM-DD"`（含当天 `00:00:00`），按 `occurred_at` 统计 |
+| dateTo | const QString& | 截止日期，格式 `"YYYY-MM-DD"`（含当天 `23:59:59`） |
+
+- **输出参数 / 返回值**
+| 参数名 | 类型 | 说明 |
+|---|---|---|
+| result | QMap\<QString, int\>* | 统计结果，key=灾害类型名称，value=发生次数 |
+| errorMessage | QString* | 错误信息 |
+| (return) | bool | 成功返回 `true`，失败返回 `false` |
+
+- **返回结果示例**
+  ```
+  { "火灾": 2, "洪涝": 4, "地震": 1 }
+  ```
+
+- **调用示例**
+  ```cpp
+  QMap<QString, int> stats;
+  QString err;
+  if (DisasterDao::countDisasterTypesByDateRange("2025-01-01", "2025-12-31", &stats, &err)) {
+      for (auto it = stats.begin(); it != stats.end(); ++it) {
+          qDebug() << it.key() << ":" << it.value() << "次";
+      }
+  }
+  ```
+
+#### 2.12 新增大屏数据统计接口群
+
+包含四个为前端大屏量身定制的方法及对应辅助返回结构体（`DisasterTrendStats` / `DisasterFrequencyStats` / `DisasterRealtimeStats`）。功能涵盖时间点统计、灾害数及发生率趋势计算、极值灾害类型分析、实时监控任务数据追踪等。
+
+详细使用文档（含结构体说明、各个统计接口参数及释义）已单独抽离，请查阅 [README_statistics_api.md](./README_statistics_api.md) 获取最新统计应用说明。
+
 ---
 
 ### 3. OCR 文字识别 (OcrHelper)

@@ -102,6 +102,37 @@ struct DisasterQuery {
   int offset = 0;                           // 分页偏移量
 };
 
+// --- 用于大屏统计的专属结构体 ---
+
+/**
+ * @brief 灾害趋势统计结构体
+ */
+struct DisasterTrendStats {
+  int todayCount = 0;
+  double todayYoY = 0.0; // 今日环比(%)，例如 40.5 表示 40.5%
+  int monthCount = 0;
+  double monthYoY = 0.0; // 本月环比(%)
+};
+
+/**
+ * @brief 极值频次灾害统计结构体
+ */
+struct DisasterFrequencyStats {
+  QString mostFrequentType;  // 最高频灾害名称
+  int mostFrequentCount = 0; // 最高频灾害数量
+  QString rarestType;        // 最罕见灾害名称
+  int rarestCount = 0;       // 最罕见灾害数量
+};
+
+/**
+ * @brief 实时监测统计结构体
+ */
+struct DisasterRealtimeStats {
+  int unassignedCount = 0;    // 未分配的灾害数
+  int resolvedTodayCount = 0; // 今日已解决的灾害数
+  int processingCount = 0;    // 正在处理中的任务数
+};
+
 class DisasterDao {
 public:
   // 创建灾害记录
@@ -182,6 +213,69 @@ public:
       bool hasSeverityMax, int severityMax, const QString &occurredAtFrom,
       const QString &occurredAtTo, int limit, int offset,
       QList<DisasterRecord> *records, QString *errorMessage);
+<<<<<<< Updated upstream
+=======
+
+  // === 数据统计接口 ===
+
+  /**
+   * @brief 获取灾害易发生时间段
+   * @param period 查询出的时间段，格式如 "20-21"
+   * @param errorMessage 失败时的错误信息
+   * @return 成功返回 true
+   */
+  static bool getDisasterPronePeriod(QString *period, QString *errorMessage);
+
+  /**
+   * @brief 获取灾害趋势统计数据 (包括当日/本月及其环比)
+   * @param stats 用于接收统计结果的结构体
+   * @param errorMessage 失败时的错误信息
+   * @return 成功返回 true
+   */
+  static bool getDisasterTrends(DisasterTrendStats *stats, QString *errorMessage);
+
+  /**
+   * @brief 获取当前最高频与最罕见灾害类型
+   * @param stats 用于接收结果的结构体
+   * @param errorMessage 失败时的错误信息
+   * @return 成功返回 true
+   */
+  static bool getDisasterFrequencyStats(DisasterFrequencyStats *stats, QString *errorMessage);
+
+  /**
+   * @brief 获取大屏实时监测面板统计数据 (未分配、今日已解决、处理中)
+   * @param stats 用于接收结果的结构体
+   * @param errorMessage 失败时的错误信息
+   * @return 成功返回 true
+   */
+  static bool getRealtimeMonitoringStats(DisasterRealtimeStats *stats, QString *errorMessage);
+
+  /**
+   * @brief 根据指定日期查询当天发生或录入的灾害记录
+   * @param date          日期字符串，格式 "YYYY-MM-DD"
+   * @param useOccurredAt true=按发生时间(occurred_at)过滤，false=按创建时间(created_at)过滤
+   * @param records       结果列表
+   * @param errorMessage  失败时的详细错误描述输出
+   * @return 查询成功返回 true
+   */
+  static bool getDisastersByDate(const QString &date,
+                                 QList<DisasterRecord> *records,
+                                 QString *errorMessage);
+
+  /**
+   * @brief 按日期范围统计各灾害类型发生数量
+   * @param dateFrom      起始日期 "YYYY-MM-DD"（含）
+   * @param dateTo        截止日期 "YYYY-MM-DD"（含，自动补全至当天 23:59:59）
+   * @param useOccurredAt true=按发生时间统计，false=按创建时间统计
+   * @param result        统计结果，key=灾害类型名称，value=发生数量
+   * @param errorMessage  失败时的详细错误描述输出
+   * @return 统计成功返回 true
+   */
+  static bool countDisasterTypesByDateRange(const QString &dateFrom,
+                                            const QString &dateTo,
+                                            QMap<QString, int> *result,
+                                            QString *errorMessage);
+>>>>>>> Stashed changes
 };
 
 #endif // DISASTERDAO_H
