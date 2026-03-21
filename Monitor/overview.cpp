@@ -636,14 +636,12 @@ void overview::onEditClicked()
     qint64 id = btn->property("recordId").toLongLong();
 
     // 1. 从表格中获取当前行的数据
-    int targetRow = -1;
     DisasterRecord currentRecord;
     bool found = false;
 
     for (int i = 0; i < disasterTable->rowCount(); ++i) {
         QTableWidgetItem *idItem = disasterTable->item(i, 0);
         if (idItem && idItem->text().toLongLong() == id) {
-            targetRow = i;
             currentRecord.id = id;
             currentRecord.disasterType = disasterTable->item(i, 1)->text();
             currentRecord.location = disasterTable->item(i, 2)->text();

@@ -20,6 +20,7 @@
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QScatterSeries>
 #include <QtCharts/QValueAxis>
+#include <QtCharts/QDateTimeAxis>
 #include <QtCharts/QBarSeries>
 #include <QtCharts/QBarSet>
 #include <QtCharts/QBarCategoryAxis> // 【新增】条形图分类轴
@@ -106,7 +107,8 @@ private:
     QChart *lineChart;
     QLineSeries *lineSeries;
     QScatterSeries *scatterSeries;
-    QValueAxis *axisX;
+    QScatterSeries *hoverSeries;
+    QDateTimeAxis *axisX;
     QValueAxis *axisY;
 
     // 自定义 Tooltip 标签

@@ -230,6 +230,36 @@ public:
                                             const QString &dateTo,
                                             QMap<QString, int> *result,
                                             QString *errorMessage);
+
+  /**
+   * @brief 用于大屏监控面板统一的基础数据统计信息聚合
+   * 包含实时监测、今日/当月灾害总数及同环比相关指标、频繁统计与时间点特征
+   */
+  struct DashboardStats {
+      int unassignedDisasters = 0;      // 尚未分配灾害
+      int todayResolvedTasks = 0;       // 今日已解决灾害（任务进度100%）
+      int processingTasks = 0;          // 正在处理灾害（有派单但未完成）
+
+      int todayDisastersCount = 0;      // 今日发生的灾害数
+      int monthDisastersCount = 0;      // 本月发生的灾害数
+      int yesterdayDisastersCount = 0;  // 昨日发生的灾害数（计算发生率用）
+
+      QString mostFrequentDisaster;     // 当前最频繁灾害
+      int mostFrequentDisasterCount = 0;
+
+      QString rareDisaster;             // 罕见灾害
+      int rareDisasterCount = 0;
+
+      QString proneTimePeriod;          // 灾害易发生时间段(h)，例如 "20-21"
+  };
+
+  /**
+   * @brief 获取大屏监控统计数据
+   * @param stats 统计数据存放结构体指针
+   * @param errorMessage 失败时的详细错误描述输出
+   * @return 统计成功返回 true
+   */
+  static bool getDashboardStats(DashboardStats *stats, QString *errorMessage);
 };
 
 #endif // DISASTERDAO_H

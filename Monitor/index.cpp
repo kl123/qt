@@ -47,15 +47,15 @@ index::index(QWidget *parent) : QMainWindow(parent)
             color: #e0e6f6;
             border: 1px solid #00d8ff;
             border-left: 4px solid #00d8ff;
-            border-radius: 6px;
-            padding: 10px;
-            font-size: 12px;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 15px;
             font-family: "Microsoft YaHei";
-            line-height: 1.4;
+            line-height: 1.6;
         }
-        b { color: #00d8ff; font-weight: bold; }
-        .type-fire { color: #ff4d4d; }
-        .type-warn { color: #ffaa00; }
+        b { color: #00d8ff; font-weight: bold; font-size: 17px; }
+        .type-fire { color: #ff4d4d; font-size: 16px; font-weight: bold; }
+        .type-warn { color: #ffaa00; font-size: 16px; font-weight: bold; }
         hr { border: 0; border-top: 1px dashed #445566; margin: 6px 0; }
     )");
     tooltipLabel->setWindowFlags(Qt::Tool | Qt::FramelessWindowHint);
@@ -242,7 +242,7 @@ void index::setupLeftPanel()
     leftPanelLayout->setContentsMargins(0, 0, 0, 0);
     leftPanelLayout->setSpacing(20);
 
-    auto createCard = [](const QString &title, const QStringList &items, const QString &colorCode) {
+    auto createCard = [](const QString &title, const QStringList &items, const QString &/*colorCode*/, const QString &objPrefix) {
         QFrame *card = new QFrame();
         card->setFrameShape(QFrame::NoFrame);
         QVBoxLayout *layout = new QVBoxLayout(card);
@@ -252,8 +252,10 @@ void index::setupLeftPanel()
         lblTitle->setFont(QFont("Microsoft YaHei", 18, QFont::Bold));
         lblTitle->setStyleSheet("color: #00d8ff;");
         layout->addWidget(lblTitle);
+        int idx = 0;
         for (const QString &text : items) {
             QLabel *lbl = new QLabel(text);
+            lbl->setObjectName(objPrefix + "_" + QString::number(idx++));
             lbl->setFont(QFont("Microsoft YaHei", 14));
             lbl->setStyleSheet("color: #e0e6f6;");
             layout->addWidget(lbl);
@@ -262,10 +264,10 @@ void index::setupLeftPanel()
         return card;
     };
 
-    cardUnit = createCard("📊 时间点统计", {"灾害易发生时间段 (h)    20-21"}, "#0f2a4a");
-    cardDevice = createCard("🔧 今日使用", {"时长 (h)    1h"}, "#2a0f4a");
-    cardMonitor = createCard("🚨 实时监测", {"尚未分配灾害    20", "今日已解决灾害    30", "正在处理灾害    10"}, "#4a2a0f");
-    cardService = createCard("👨💻 服务机构", {"单位名  杭州灾害预警中心", "在线用户  10"}, "#0f4a2a");
+    cardUnit = createCard("📊 时间点统计", {"灾害易发生时间段 (h)    --"}, "#0f2a4a", "card_time");
+    cardDevice = createCard("🔧 今日使用", {"时长 (h)    1h"}, "#2a0f4a", "card_device");
+    cardMonitor = createCard("🚨 实时监测", {"尚未分配灾害    --", "今日已解决灾害    --", "正在处理灾害    --"}, "#4a2a0f", "card_monitor");
+    cardService = createCard("👨💻 服务机构", {"单位名  杭州灾害预警中心", "在线用户  10"}, "#0f4a2a", "card_service");
 
     cardUnit->setStyleSheet("background-color: #0f2a4a; border-radius: 12px;");
     cardDevice->setStyleSheet("background-color: #2a0f4a; border-radius: 12px;");
@@ -315,6 +317,14 @@ void index::setupDateRangeControl(QHBoxLayout *layout, QDateEdit *&startEdit, QD
             border-top: 6px solid #00d8ff;
             margin-right: 5px;
         }
+        QCalendarWidget { background-color: #0a2a5a; color: #1a2b45; font-weight: bold; }
+        QCalendarWidget QTableView { alternate-background-color: #0a1a3a; background-color: #0f2a4a; color: #e0e6f6; }
+        QCalendarWidget QWidget#qt_calendar_navigationbar { background-color: #0a1a3a; color: white; }
+        QCalendarWidget QToolButton { color: white; background-color: transparent; font-weight: bold; }
+        QCalendarWidget QMenu { background-color: #0f2a4a; color: white; }
+        QCalendarWidget QSpinBox { background-color: #0f2a4a; color: white; }
+        QCalendarWidget QAbstractItemView:enabled { background-color: #0f2a4a; color: #e0e6f6; selection-background-color: #00d8ff; selection-color: black; }
+        QCalendarWidget QAbstractItemView:disabled { color: #445566; }
     )";
     startEdit->setStyleSheet(dateStyle);
     endEdit->setStyleSheet(dateStyle);
@@ -337,7 +347,7 @@ void index::setupRightPanel()
     // --- 顶部统计卡片 ---
     cardLayout = new QHBoxLayout();
     cardLayout->setSpacing(20);
-    auto createStatCard = [](const QString &title, const QString &realText, const QString &totalText, const QString &gradientStart, const QString &gradientEnd) {
+    auto createStatCard = [](const QString &title, const QString &realText, const QString &totalText, const QString &gradientStart, const QString &gradientEnd, const QString &objPrefix) {
         QFrame *card = new QFrame();
         card->setFrameShape(QFrame::NoFrame);
         QVBoxLayout *layout = new QVBoxLayout(card);
@@ -347,11 +357,15 @@ void index::setupRightPanel()
         lblTitle->setFont(QFont("Microsoft YaHei", 16, QFont::Bold));
         lblTitle->setStyleSheet("color: white;");
         QLabel *lblReal = new QLabel(realText);
+        lblReal->setObjectName(objPrefix + "_real");
         lblReal->setFont(QFont("Microsoft YaHei", 18, QFont::Bold));
         lblReal->setStyleSheet("color: #ff4d4d;");
         QLabel *lblTotal = new QLabel(totalText);
-        lblTotal->setFont(QFont("Microsoft YaHei", 14));
-        lblTotal->setStyleSheet("color: #ffaa00;");
+        if (!totalText.isEmpty()) {
+            lblTotal->setObjectName(objPrefix + "_total");
+            lblTotal->setFont(QFont("Microsoft YaHei", 14));
+            lblTotal->setStyleSheet("color: #ffaa00;");
+        }
         layout->addWidget(lblTitle);
         layout->addWidget(lblReal);
         if (!totalText.isEmpty()) layout->addWidget(lblTotal);
@@ -360,10 +374,10 @@ void index::setupRightPanel()
         return card;
     };
 
-    cardFireAlarm = createStatCard("灾害数", "当日实时数  56", "本月累计数  5620488", "#3a0a1a", "#5a1a2a");
-    cardHighRisk = createStatCard("发生率", "今日  40%", "本月  15620488", "#3a2a0a", "#5a3a1a");
-    cardElecFire = createStatCard("当前最频繁灾害", "火灾", "累计数  5620488", "#0a2a5a", "#1a3a6a");
-    cardRealFire = createStatCard("罕见灾害", "地震", "累计数 1", "#3a0a0a", "#5a1a1a");
+    cardFireAlarm = createStatCard("灾害数", "当日实时数  --", "本月累计数  --", "#3a0a1a", "#5a1a2a", "stat_disaster");
+    cardHighRisk = createStatCard("发生率", "今日  --%", "本月  --", "#3a2a0a", "#5a3a1a", "stat_rate");
+    cardElecFire = createStatCard("当前最频繁灾害", "暂无", "累计数  --", "#0a2a5a", "#1a3a6a", "stat_freq");
+    cardRealFire = createStatCard("罕见灾害", "暂无", "累计数 --", "#3a0a0a", "#5a1a1a", "stat_rare");
 
     cardLayout->addWidget(cardFireAlarm, 1);
     cardLayout->addWidget(cardHighRisk, 1);
@@ -399,6 +413,14 @@ void index::setupRightPanel()
         QDateEdit { background-color: #0a2a5a; color: #ffffff; border: 1px solid #0066cc; border-radius: 4px; padding: 4px 8px; font-size: 13px; font-family: "Microsoft YaHei"; }
         QDateEdit::drop-down { border: none; width: 20px; }
         QDateEdit::down-arrow { image: none; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid #00d8ff; margin-right: 5px; }
+        QCalendarWidget { background-color: #0a2a5a; color: #1a2b45; font-weight: bold; }
+        QCalendarWidget QTableView { alternate-background-color: #0a1a3a; background-color: #0f2a4a; color: #e0e6f6; }
+        QCalendarWidget QWidget#qt_calendar_navigationbar { background-color: #0a1a3a; color: white; }
+        QCalendarWidget QToolButton { color: white; background-color: transparent; font-weight: bold; }
+        QCalendarWidget QMenu { background-color: #0f2a4a; color: white; }
+        QCalendarWidget QSpinBox { background-color: #0f2a4a; color: white; }
+        QCalendarWidget QAbstractItemView:enabled { background-color: #0f2a4a; color: #e0e6f6; selection-background-color: #00d8ff; selection-color: black; }
+        QCalendarWidget QAbstractItemView:disabled { color: #445566; }
     )");
     connect(dateSelector, &QDateEdit::dateChanged, this, [this]() { GetData(); });
 
@@ -414,14 +436,13 @@ void index::setupRightPanel()
     lineChart->setAnimationOptions(QChart::SeriesAnimations);
     lineChart->setMargins(QMargins(0, 0, 0, 0));
 
-    axisX = new QValueAxis();
+    axisX = new QDateTimeAxis();
     axisX->setTitleText("发生时刻");
-    axisX->setLabelFormat("hh:mm");
+    axisX->setFormat("HH:mm");
     axisX->setGridLineColor(QColor("#2a3b55"));
     axisX->setLabelsColor(QColor("#a0aab5"));
     axisX->setTitleBrush(QBrush(QColor("#a0aab5")));
     axisX->setMinorGridLineColor(QColor("#1a2b45"));
-    axisX->applyNiceNumbers();
     lineChart->addAxis(axisX, Qt::AlignBottom);
 
     axisY = new QValueAxis();
@@ -442,48 +463,58 @@ void index::setupRightPanel()
     scatterSeries = new QScatterSeries();
     scatterSeries->setName("数据点");
     scatterSeries->setMarkerSize(10);
-    scatterSeries->setColor(QColor("#ff4d4d"));
-    scatterSeries->setBorderColor(QColor("#ffffff"));
+    scatterSeries->setMarkerShape(QScatterSeries::MarkerShapeCircle);
+    scatterSeries->setColor(QColor("#00d8ff"));
+    scatterSeries->setBorderColor(Qt::transparent);
+
+    hoverSeries = new QScatterSeries();
+    hoverSeries->setName("选中点");
+    hoverSeries->setMarkerSize(18);
+    hoverSeries->setMarkerShape(QScatterSeries::MarkerShapeCircle);
+    hoverSeries->setColor(QColor("#ffffff"));
+    hoverSeries->setBorderColor(QColor("#ff4d4d"));
 
     connect(scatterSeries, &QScatterSeries::hovered, this, [this](const QPointF &point, bool state) {
         if (state) {
+            hoverSeries->clear();
+            hoverSeries->append(point);
             qint64 timestamp = static_cast<qint64>(point.x());
             QList<DisasterRecord> records = pointDataMap.values(timestamp);
             if (records.isEmpty()) { hideTooltip(); return; }
-            QString infoHtml = "<div style='font-size:12px;'>";
+            QString infoHtml = "<div style='font-size:14px;'>";
             QDateTime firstDt = QDateTime::fromMSecsSinceEpoch(timestamp);
-            infoHtml += QString("<b style='font-size:14px; color:#00d8ff;'>⏰ %1 (共 %2 起)</b><br><hr>")
+            infoHtml += QString("<b style='color:#00d8ff;'>⏰ %1  (共 %2 起)</b><br><hr>")
                         .arg(firstDt.toString("HH:mm")).arg(records.size());
             for (const auto& rec : records) {
                 QString typeName = rec.disasterType.isEmpty() ? "监测报警" : rec.disasterType;
                 QString typeClass = typeName.contains("火") ? "type-fire" : "type-warn";
-                QString severityInfo = QString("等级：<b style='color:#ff4d4d'>%1</b>").arg(rec.severity);
+                QString severityInfo = QString("等级：<b style='color:#ff4d4d; font-size:15px;'>%1</b>").arg(rec.severity);
                 QString desc = rec.content.isEmpty() ? rec.location : rec.content;
-                infoHtml += QString("<div style='margin-bottom:6px;'>"
-                                    "<b class='%1'>🔥 %2</b> (%3)<br>📍 %3<br>📝 <span style='color:#aaa;'>%4</span></div>")
+                infoHtml += QString("<div style='margin-bottom:8px; line-height: 1.5;'>"
+                                    "<span class='%1'>🔥 %2</span> (%3)<br>📍 %4<br>📝 <span style='color:#ccc;'>%5</span></div>")
                     .arg(typeClass).arg(typeName).arg(severityInfo).arg(rec.location)
                     .arg(desc.length() > 20 ? desc.left(20) + "..." : desc);
-                if (&rec != &records.last()) infoHtml += "<hr style='border:0; border-top:1px dashed #334455; margin:4px 0;'>";
+                if (&rec != &records.last()) infoHtml += "<hr style='border:0; border-top:1px dashed #334455; margin:6px 0;'>";
             }
             infoHtml += "</div>";
             QPoint chartPos = lineChart->mapToPosition(point).toPoint();
             QPoint globalPos = chartView->mapToGlobal(chartPos);
             showTooltip(globalPos, infoHtml);
-            scatterSeries->setMarkerSize(16);
-            scatterSeries->setColor(QColor("#ffff00"));
         } else {
             hideTooltip();
-            scatterSeries->setMarkerSize(10);
-            scatterSeries->setColor(QColor("#ff4d4d"));
+            hoverSeries->clear();
         }
     });
 
     lineChart->addSeries(lineSeries);
     lineChart->addSeries(scatterSeries);
+    lineChart->addSeries(hoverSeries);
     lineSeries->attachAxis(axisX);
     lineSeries->attachAxis(axisY);
     scatterSeries->attachAxis(axisX);
     scatterSeries->attachAxis(axisY);
+    hoverSeries->attachAxis(axisX);
+    hoverSeries->attachAxis(axisY);
 
     chartView = new QChartView(lineChart);
     chartView->setRenderHint(QPainter::Antialiasing);
@@ -630,6 +661,49 @@ void index::GetData()
     // 统一调用，传入本地变量 records
     // 无论成功与否，records 现在都是一个合法的 QList（要么有数据，要么被 clear() 过）
     updateLineChart(records);
+
+    // ================= 拉取总览统计数据 =================
+    DisasterDao::DashboardStats stats;
+    QString statsErr;
+    if (DisasterDao::getDashboardStats(&stats, &statsErr)) {
+        auto setLabelText = [this](const QString &objName, const QString &text) {
+            if (QLabel *lbl = this->findChild<QLabel *>(objName)) {
+                lbl->setText(text);
+            }
+        };
+
+        // 实时监测
+        setLabelText("card_monitor_0", QString("尚未分配灾害    %1").arg(stats.unassignedDisasters));
+        setLabelText("card_monitor_1", QString("今日已解决灾害    %1").arg(stats.todayResolvedTasks));
+        setLabelText("card_monitor_2", QString("正在处理灾害    %1").arg(stats.processingTasks));
+
+        // 时间点统计
+        setLabelText("card_time_0", QString("灾害易发生时间段 (h)    %1").arg(stats.proneTimePeriod));
+
+        // 灾害数
+        setLabelText("stat_disaster_real", QString("当日实时数  %1").arg(stats.todayDisastersCount));
+        setLabelText("stat_disaster_total", QString("本月累计数  %1").arg(stats.monthDisastersCount));
+
+        // 发生率计算
+        int todayRt = 0;
+        if (stats.yesterdayDisastersCount > 0) {
+            todayRt = (stats.todayDisastersCount - stats.yesterdayDisastersCount) * 100 / stats.yesterdayDisastersCount;
+        } else if (stats.todayDisastersCount > 0) {
+            todayRt = 100;
+        }
+        QString sign = todayRt > 0 ? "+" : "";
+        setLabelText("stat_rate_real", QString("今日  %1%2%").arg(sign).arg(todayRt));
+        setLabelText("stat_rate_total", QString("本月  %1").arg(stats.monthDisastersCount));
+
+        // 频繁/罕见灾害
+        setLabelText("stat_freq_real", stats.mostFrequentDisaster);
+        setLabelText("stat_freq_total", QString("累计数  %1").arg(stats.mostFrequentDisasterCount));
+
+        setLabelText("stat_rare_real", stats.rareDisaster);
+        setLabelText("stat_rare_total", QString("累计数  %1").arg(stats.rareDisasterCount));
+    } else {
+        qWarning() << "获取 Dashboard Stats 失败:" << statsErr;
+    }
 }
 
 void index::updateLineChart(const QList<DisasterRecord> &records)
@@ -646,7 +720,7 @@ void index::updateLineChart(const QList<DisasterRecord> &records)
 
         // 【修改点】再次确认 records 是否真的可用
         if (records.isEmpty()) {
-            axisX->setRange(0, 1);
+            axisX->setRange(QDateTime::currentDateTime().addDays(-1), QDateTime::currentDateTime());
             axisY->setRange(0, 10);
             return;
         }
@@ -670,7 +744,7 @@ void index::updateLineChart(const QList<DisasterRecord> &records)
         }
 
         if (timeToMaxSeverityMap.isEmpty()) {
-            axisX->setRange(0, 1);
+            axisX->setRange(QDateTime::currentDateTime().addDays(-1), QDateTime::currentDateTime());
             axisY->setRange(0, 10);
             return;
         }
@@ -687,7 +761,7 @@ void index::updateLineChart(const QList<DisasterRecord> &records)
         qint64 padding = (maxTime - minTime) * 0.05;
         minTime -= padding; maxTime += padding;
     }
-    axisX->setRange(minTime, maxTime);
+    axisX->setRange(QDateTime::fromMSecsSinceEpoch(minTime), QDateTime::fromMSecsSinceEpoch(maxTime));
 
     int maxSeverity = 0;
     for (auto it = timeToMaxSeverityMap.begin(); it != timeToMaxSeverityMap.end(); ++it) {
@@ -784,7 +858,7 @@ void index::updateTypeChart() {
                 slice->setLabelColor(QColor("#e0e6f6"));
                 slice->setLabelFont(QFont("Microsoft YaHei", 10));
                 // 初始化标签文本
-                slice->setLabel(QString("%1").arg(it.key()));
+                slice->setLabel(QString("%1: %2起").arg(it.key()).arg(it.value()));
                 colorIdx++;
             }
         }
@@ -793,7 +867,7 @@ void index::updateTypeChart() {
             pieSeries->append("无数据", 1)->setColor(QColor("#555555"));
         }
 
-        pieSeries->setPieSize(0.8);
+        pieSeries->setPieSize(0.65);
 
     } else {
         qWarning() << "饼图数据加载失败:" << err;
@@ -810,13 +884,9 @@ void index::onPieSliceHovered(QPieSlice *slice, bool state)
     if (state) {
         slice->setExploded(true);
         slice->setLabelVisible(true);
-        // 显示详细数据：名称 + 数量
-        slice->setLabel(QString("%1\n%2 起").arg(slice->label()).arg((int)slice->value()));
         slice->setPen(QPen(QColor("#00d8ff"), 2));
     } else {
         slice->setExploded(false);
-        // 恢复为仅名称
-        slice->setLabel(QString("%1").arg(slice->label().split('\n').first()));
         slice->setPen(QPen(QColor("#ffffff"), 1));
     }
 }

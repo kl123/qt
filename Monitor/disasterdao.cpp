@@ -3,6 +3,7 @@
 #include <QtCore/QCoreApplication>
 #include <QtCore/QDir>
 #include <QtCore/QVariant>
+#include <QtCore/QDate>
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlError>
 #include <QtSql/QSqlQuery>
@@ -995,6 +996,96 @@ bool DisasterDao::countDisasterTypesByDateRange(const QString &dateFrom,
       const int     cnt  = query.value(1).toInt();
       (*result)[type]    = cnt;
     }
+  }
+
+  return true;
+}
+
+bool DisasterDao::getDashboardStats(DashboardStats *stats, QString *errorMessage) {
+  if (!stats) {
+    if (errorMessage) *errorMessage = QStringLiteral("统计结果指针为空");
+    return false;
+  }
+
+  QString connError;
+  if (!ensureSqliteConnection(&connError)) {
+    if (errorMessage) *errorMessage = connError;
+    return false;
+  }
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
+
+  QString schemaError;
+  if (!ensureDisasterSchema(db, &schemaError)) {
+    if (errorMessage) *errorMessage = schemaError;
+    return false;
+  }
+
+  QDate todayDate = QDate::currentDate();
+  QString todayStr = todayDate.toString("yyyy-MM-dd");
+  QString yesterdayStr = todayDate.addDays(-1).toString("yyyy-MM-dd");
+  QString thisMonthStr = todayDate.toString("yyyy-MM");
+
+  *stats = DashboardStats();
+  QSqlQuery query(db);
+
+  if (query.exec("SELECT COUNT(*) FROM disasters WHERE id NOT IN (SELECT disaster_id FROM disaster_tasks)")) {
+      if (query.next()) stats->unassignedDisasters = query.value(0).toInt();
+  }
+
+  if (query.exec("SELECT COUNT(*) FROM disasters WHERE id IN (SELECT disaster_id FROM disaster_tasks WHERE progress < 100)")) {
+      if (query.next()) stats->processingTasks = query.value(0).toInt();
+  }
+
+  query.prepare("SELECT COUNT(*) FROM disasters WHERE substr(occurred_at, 1, 10) = ? AND id IN (SELECT disaster_id FROM disaster_tasks WHERE progress = 100)");
+  query.addBindValue(todayStr);
+  if (query.exec() && query.next()) {
+      stats->todayResolvedTasks = query.value(0).toInt();
+  }
+
+  query.prepare("SELECT COUNT(*) FROM disasters WHERE substr(occurred_at, 1, 10) = ?");
+  query.addBindValue(todayStr);
+  if (query.exec() && query.next()) {
+      stats->todayDisastersCount = query.value(0).toInt();
+  }
+
+  query.prepare("SELECT COUNT(*) FROM disasters WHERE substr(occurred_at, 1, 10) = ?");
+  query.addBindValue(yesterdayStr);
+  if (query.exec() && query.next()) {
+      stats->yesterdayDisastersCount = query.value(0).toInt();
+  }
+
+  query.prepare("SELECT COUNT(*) FROM disasters WHERE substr(occurred_at, 1, 7) = ?");
+  query.addBindValue(thisMonthStr);
+  if (query.exec() && query.next()) {
+      stats->monthDisastersCount = query.value(0).toInt();
+  }
+
+  if (query.exec("SELECT disaster_type, COUNT(*) as cnt FROM disasters GROUP BY disaster_type ORDER BY cnt DESC LIMIT 1")) {
+      if (query.next()) {
+          stats->mostFrequentDisaster = query.value(0).toString();
+          stats->mostFrequentDisasterCount = query.value(1).toInt();
+      } else {
+          stats->mostFrequentDisaster = "暂无";
+      }
+  }
+
+  if (query.exec("SELECT disaster_type, COUNT(*) as cnt FROM disasters GROUP BY disaster_type ORDER BY cnt ASC LIMIT 1")) {
+      if (query.next()) {
+          stats->rareDisaster = query.value(0).toString();
+          stats->rareDisasterCount = query.value(1).toInt();
+      } else {
+          stats->rareDisaster = "暂无";
+      }
+  }
+
+  if (query.exec("SELECT substr(occurred_at, 12, 2) as hr, COUNT(*) as cnt FROM disasters WHERE occurred_at IS NOT NULL AND length(occurred_at) >= 13 GROUP BY hr ORDER BY cnt DESC LIMIT 1")) {
+      if (query.next() && !query.value(0).toString().isEmpty()) {
+          QString hrStr = query.value(0).toString();
+          int hr = hrStr.toInt();
+          stats->proneTimePeriod = QString("%1-%2").arg(hr, 2, 10, QChar('0')).arg((hr + 1) % 24, 2, 10, QChar('0'));
+      } else {
+          stats->proneTimePeriod = "未知";
+      }
   }
 
   return true;
