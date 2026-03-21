@@ -491,8 +491,8 @@ bool DisasterDao::queryDisasters(const DisasterQuery &queryModel,
 }
 
 bool DisasterDao::getUnassignedDisastersByDispatcher(
-    qint64 dispatcherId, int limit, int offset,
-    QList<DisasterRecord> *records, QString *errorMessage) {
+    qint64 dispatcherId, int limit, int offset, QList<DisasterRecord> *records,
+    QString *errorMessage) {
   QString connError;
   if (!ensureSqliteConnection(&connError)) {
     if (errorMessage) {
@@ -676,11 +676,9 @@ bool DisasterDao::getTasksForDisaster(qint64 disasterId,
 
   QSqlQuery query(db);
   query.prepare("SELECT t.id, t.disaster_id, t.handler_user_id, t.progress, "
-                "t.assigned_at, u.username, u.phone, "
-                "d.disaster_type, d.location, d.severity "
+                "t.assigned_at, u.username, u.phone "
                 "FROM disaster_tasks t "
                 "LEFT JOIN users u ON t.handler_user_id = u.id "
-                "LEFT JOIN disasters d ON t.disaster_id = d.id "
                 "WHERE t.disaster_id = ? "
                 "ORDER BY t.assigned_at DESC;");
   query.addBindValue(disasterId);
@@ -701,9 +699,6 @@ bool DisasterDao::getTasksForDisaster(qint64 disasterId,
       r.assignedAt = query.value(4).toString();
       r.handlerName = query.value(5).toString();
       r.handlerPhone = query.value(6).toString();
-      r.disasterType = query.value(7).toString();
-      r.location = query.value(8).toString();
-      r.severity = query.value(9).toInt();
       tasks->push_back(r);
     }
   }
@@ -807,15 +802,19 @@ bool DisasterDao::deleteDisasterTask(qint64 taskId, QString *errorMessage) {
   return true;
 }
 
-bool DisasterDao::getTasksForUser(qint64 userId, const QString& role, int limit, int offset, QList<DisasterTaskRecord> *tasks, QString *errorMessage) {
+bool DisasterDao::getTasksForUser(qint64 userId, const QString &role, int limit,
+                                  int offset, QList<DisasterTaskRecord> *tasks,
+                                  QString *errorMessage) {
   if (userId <= 0) {
-    if (errorMessage) *errorMessage = QStringLiteral("无效的用户ID");
+    if (errorMessage)
+      *errorMessage = QStringLiteral("无效的用户ID");
     return false;
   }
 
   QString connError;
   if (!ensureSqliteConnection(&connError)) {
-    if (errorMessage) *errorMessage = connError;
+    if (errorMessage)
+      *errorMessage = connError;
     return false;
   }
   QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
@@ -824,9 +823,12 @@ bool DisasterDao::getTasksForUser(qint64 userId, const QString& role, int limit,
     tasks->clear();
   }
 
-  if (limit <= 0) limit = 100;
-  if (limit > 500) limit = 500;
-  if (offset < 0) offset = 0;
+  if (limit <= 0)
+    limit = 100;
+  if (limit > 500)
+    limit = 500;
+  if (offset < 0)
+    offset = 0;
 
   QSqlQuery query(db);
   QString sql = "SELECT t.id, t.disaster_id, t.handler_user_id, t.progress, "
@@ -838,22 +840,23 @@ bool DisasterDao::getTasksForUser(qint64 userId, const QString& role, int limit,
 
   // 指挥调度员查询所有任务，普通处理人员只查询被指派给自己的任务
   if (role != QStringLiteral("指挥调度员")) {
-      sql += "WHERE t.handler_user_id = ? ";
+    sql += "WHERE t.handler_user_id = ? ";
   }
 
   sql += "ORDER BY t.assigned_at DESC LIMIT ? OFFSET ?;";
 
   query.prepare(sql);
-  
+
   if (role != QStringLiteral("指挥调度员")) {
-      query.addBindValue(userId);
+    query.addBindValue(userId);
   }
-  
+
   query.addBindValue(limit);
   query.addBindValue(offset);
 
   if (!query.exec()) {
-    if (errorMessage) *errorMessage = query.lastError().text();
+    if (errorMessage)
+      *errorMessage = query.lastError().text();
     return false;
   }
 
@@ -885,7 +888,8 @@ bool DisasterDao::getDisastersByDate(const QString &date,
   const QString dateStr = date.trimmed();
   if (dateStr.isEmpty()) {
     if (errorMessage)
-      *errorMessage = QStringLiteral("日期不能为空，请传入格式为 YYYY-MM-DD 的日期字符串");
+      *errorMessage =
+          QStringLiteral("日期不能为空，请传入格式为 YYYY-MM-DD 的日期字符串");
     return false;
   }
 
@@ -941,7 +945,7 @@ bool DisasterDao::countDisasterTypesByDateRange(const QString &dateFrom,
                                                 QMap<QString, int> *result,
                                                 QString *errorMessage) {
   const QString fromStr = dateFrom.trimmed();
-  const QString toStr   = dateTo.trimmed();
+  const QString toStr = dateTo.trimmed();
 
   if (fromStr.isEmpty() || toStr.isEmpty()) {
     if (errorMessage)
@@ -969,7 +973,7 @@ bool DisasterDao::countDisasterTypesByDateRange(const QString &dateFrom,
 
   // 固定使用 occurred_at（发生时间），截止日期补全到当天末尾 23:59:59
   const QString fromFull = fromStr.left(10) + QStringLiteral(" 00:00:00");
-  const QString toFull   = toStr.left(10)   + QStringLiteral(" 23:59:59");
+  const QString toFull = toStr.left(10) + QStringLiteral(" 23:59:59");
 
   const QString sql =
       QStringLiteral("SELECT disaster_type, COUNT(*) AS cnt "
@@ -992,11 +996,189 @@ bool DisasterDao::countDisasterTypesByDateRange(const QString &dateFrom,
   if (result) {
     while (query.next()) {
       const QString type = query.value(0).toString();
-      const int     cnt  = query.value(1).toInt();
-      (*result)[type]    = cnt;
+      const int cnt = query.value(1).toInt();
+      (*result)[type] = cnt;
     }
   }
 
   return true;
 }
 
+bool DisasterDao::getDisasterPronePeriod(QString *period,
+                                         QString *errorMessage) {
+  QString connError;
+  if (!ensureSqliteConnection(&connError)) {
+    if (errorMessage)
+      *errorMessage = connError;
+    return false;
+  }
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
+
+  QSqlQuery query(db);
+  // 获取频率最高的小时，如果 occurred_at 格式为 YYYY-MM-DD HH:MM:SS
+  query.prepare(QStringLiteral(
+      "SELECT strftime('%H', occurred_at) as hour, count(*) as cnt "
+      "FROM disasters "
+      "WHERE occurred_at IS NOT NULL AND occurred_at != '' "
+      "GROUP BY hour "
+      "ORDER BY cnt DESC LIMIT 1;"));
+
+  if (!query.exec()) {
+    if (errorMessage)
+      *errorMessage = query.lastError().text();
+    return false;
+  }
+
+  if (query.next()) {
+    QString hourStr = query.value(0).toString();
+    if (hourStr.isEmpty()) {
+      if (period)
+        *period = QStringLiteral("未知");
+    } else {
+      int hour = hourStr.toInt();
+      // 构造成 "20-21" 的格式
+      if (period)
+        *period = QString("%1-%2")
+                      .arg(hour, 2, 10, QChar('0'))
+                      .arg((hour + 1) % 24, 2, 10, QChar('0'));
+    }
+  } else {
+    if (period)
+      *period = QStringLiteral("暂无数据");
+  }
+  return true;
+}
+
+bool DisasterDao::getDisasterTrends(DisasterTrendStats *stats,
+                                    QString *errorMessage) {
+  if (!stats)
+    return true;
+
+  QString connError;
+  if (!ensureSqliteConnection(&connError)) {
+    if (errorMessage)
+      *errorMessage = connError;
+    return false;
+  }
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
+
+  auto getCount = [&](const QString &sql) -> int {
+    QSqlQuery q(db);
+    if (q.exec(sql) && q.next()) {
+      return q.value(0).toInt();
+    }
+    return 0;
+  };
+
+  int todayCount =
+      getCount(QStringLiteral("SELECT count(*) FROM disasters WHERE "
+                              "date(created_at) = date('now', 'localtime')"));
+  int yesterdayCount = getCount(
+      QStringLiteral("SELECT count(*) FROM disasters WHERE date(created_at) = "
+                     "date('now', '-1 day', 'localtime')"));
+  int monthCount = getCount(
+      QStringLiteral("SELECT count(*) FROM disasters WHERE strftime('%Y-%m', "
+                     "created_at) = strftime('%Y-%m', 'now', 'localtime')"));
+  int lastMonthCount = getCount(QStringLiteral(
+      "SELECT count(*) FROM disasters WHERE strftime('%Y-%m', created_at) = "
+      "strftime('%Y-%m', 'now', 'start of month', '-1 month', 'localtime')"));
+
+  stats->todayCount = todayCount;
+  stats->monthCount = monthCount;
+
+  if (yesterdayCount == 0) {
+    stats->todayYoY = todayCount > 0 ? 100.0 : 0.0;
+  } else {
+    stats->todayYoY =
+        (double)(todayCount - yesterdayCount) / yesterdayCount * 100.0;
+  }
+
+  if (lastMonthCount == 0) {
+    stats->monthYoY = monthCount > 0 ? 100.0 : 0.0;
+  } else {
+    stats->monthYoY =
+        (double)(monthCount - lastMonthCount) / lastMonthCount * 100.0;
+  }
+
+  return true;
+}
+
+bool DisasterDao::getDisasterFrequencyStats(DisasterFrequencyStats *stats,
+                                            QString *errorMessage) {
+  if (!stats)
+    return true;
+
+  QString connError;
+  if (!ensureSqliteConnection(&connError)) {
+    if (errorMessage)
+      *errorMessage = connError;
+    return false;
+  }
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
+
+  QSqlQuery qMost(db);
+  qMost.prepare(
+      QStringLiteral("SELECT disaster_type, count(*) as cnt FROM disasters "
+                     "GROUP BY disaster_type ORDER BY cnt DESC LIMIT 1;"));
+  if (qMost.exec() && qMost.next()) {
+    stats->mostFrequentType = qMost.value(0).toString();
+    stats->mostFrequentCount = qMost.value(1).toInt();
+  } else {
+    stats->mostFrequentType = QStringLiteral("暂无");
+    stats->mostFrequentCount = 0;
+  }
+
+  QSqlQuery qRare(db);
+  qRare.prepare(
+      QStringLiteral("SELECT disaster_type, count(*) as cnt FROM disasters "
+                     "GROUP BY disaster_type ORDER BY cnt ASC LIMIT 1;"));
+  if (qRare.exec() && qRare.next()) {
+    stats->rarestType = qRare.value(0).toString();
+    stats->rarestCount = qRare.value(1).toInt();
+  } else {
+    stats->rarestType = QStringLiteral("暂无");
+    stats->rarestCount = 0;
+  }
+
+  return true;
+}
+
+bool DisasterDao::getRealtimeMonitoringStats(DisasterRealtimeStats *stats,
+                                             QString *errorMessage) {
+  if (!stats)
+    return true;
+
+  QString connError;
+  if (!ensureSqliteConnection(&connError)) {
+    if (errorMessage)
+      *errorMessage = connError;
+    return false;
+  }
+  QSqlDatabase db = QSqlDatabase::database(QStringLiteral("app_sqlite"));
+
+  auto getCount = [&](const QString &sql) -> int {
+    QSqlQuery q(db);
+    if (q.exec(sql) && q.next()) {
+      return q.value(0).toInt();
+    }
+    return 0;
+  };
+
+  // 未分配：在 disasters 中，不在 disaster_tasks 中
+  stats->unassignedCount =
+      getCount(QStringLiteral("SELECT count(*) FROM disasters WHERE id NOT IN "
+                              "(SELECT disaster_id FROM disaster_tasks)"));
+
+  // 今日已解决：progress = 100，并且 assigned_at 在今天
+  // (如果业务有专门完结时间段这里可以替换，目前以分配单据时间为准或者以今天状态为准)
+  stats->resolvedTodayCount = getCount(
+      QStringLiteral("SELECT count(*) FROM disaster_tasks WHERE progress = 100 "
+                     "AND date(assigned_at) = date('now', 'localtime')"));
+
+  // 正在处理中：0 <= progress < 100
+  stats->processingCount =
+      getCount(QStringLiteral("SELECT count(*) FROM disaster_tasks WHERE "
+                              "progress >= 0 AND progress < 100"));
+
+  return true;
+}

@@ -692,6 +692,12 @@
   }
   ```
 
+#### 2.12 新增大屏数据统计接口群
+
+包含四个为前端大屏量身定制的方法及对应辅助返回结构体（`DisasterTrendStats` / `DisasterFrequencyStats` / `DisasterRealtimeStats`）。功能涵盖时间点统计、灾害数及发生率趋势计算、极值灾害类型分析、实时监控任务数据追踪等。
+
+详细使用文档（含结构体说明、各个统计接口参数及释义）已单独抽离，请查阅 [README_statistics_api.md](./README_statistics_api.md) 获取最新统计应用说明。
+
 ---
 
 ### 3. OCR 文字识别 (OcrHelper)

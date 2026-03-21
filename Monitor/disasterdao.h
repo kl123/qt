@@ -2,7 +2,6 @@
 #define DISASTERDAO_H
 
 #include <QtCore/QList>
-#include <QtCore/QMap>
 #include <QtCore/QString>
 
 /**
@@ -19,7 +18,6 @@ struct DisasterRecord {
   int severity = 0;        // 严重等级 (0为最低)
   qint64 dispatcherId = 0; // 关联的调度员ID
   QString createdAt;       // 创建时间
-  bool isDisaster = true;  // 是否确认为灾害（AI判定）
 };
 
 /**
@@ -65,11 +63,6 @@ struct DisasterTaskRecord {
   // 关联数据
   QString handlerName;  // 处置员姓名
   QString handlerPhone; // 处置员电话
-
-  // 关联的灾害详情数据（用于任务列表展示）
-  QString disasterType; // 灾害类型
-  QString location;     // 地点
-  int severity = 0;     // 严重程度
 };
 
 /**
@@ -107,6 +100,37 @@ struct DisasterQuery {
   OrderBy orderBy = OrderBy::CreatedAtDesc; // 默认按创建时间倒序
   int limit = 50;                           // 返回记录数量限制
   int offset = 0;                           // 分页偏移量
+};
+
+// --- 用于大屏统计的专属结构体 ---
+
+/**
+ * @brief 灾害趋势统计结构体
+ */
+struct DisasterTrendStats {
+  int todayCount = 0;
+  double todayYoY = 0.0; // 今日环比(%)，例如 40.5 表示 40.5%
+  int monthCount = 0;
+  double monthYoY = 0.0; // 本月环比(%)
+};
+
+/**
+ * @brief 极值频次灾害统计结构体
+ */
+struct DisasterFrequencyStats {
+  QString mostFrequentType;  // 最高频灾害名称
+  int mostFrequentCount = 0; // 最高频灾害数量
+  QString rarestType;        // 最罕见灾害名称
+  int rarestCount = 0;       // 最罕见灾害数量
+};
+
+/**
+ * @brief 实时监测统计结构体
+ */
+struct DisasterRealtimeStats {
+  int unassignedCount = 0;    // 未分配的灾害数
+  int resolvedTodayCount = 0; // 今日已解决的灾害数
+  int processingCount = 0;    // 正在处理中的任务数
 };
 
 class DisasterDao {
@@ -177,19 +201,6 @@ public:
    */
   static bool deleteDisasterTask(qint64 taskId, QString *errorMessage);
 
-  /**
-   * @brief 根据用户角色获取对应的灾害任务列表
-   * @param userId 操作用户ID
-   * @param role 操作用户角色 ("指挥调度员" 可看全部，其他角色只能看自己的)
-   * @param limit 返回条数上限
-   * @param offset 分页偏移
-   * @param tasks 结果返回列表
-   * @param errorMessage 失败时的错误信息
-   * @return true 成功, false 失败
-   */
-  static bool getTasksForUser(qint64 userId, const QString& role, int limit, int offset, QList<DisasterTaskRecord> *tasks, QString *errorMessage);
-
-
   // 综合查询灾害记录
   static bool queryDisasters(const DisasterQuery &query,
                              QList<DisasterRecord> *records,
@@ -202,8 +213,42 @@ public:
       bool hasSeverityMax, int severityMax, const QString &occurredAtFrom,
       const QString &occurredAtTo, int limit, int offset,
       QList<DisasterRecord> *records, QString *errorMessage);
+<<<<<<< Updated upstream
+=======
 
   // === 数据统计接口 ===
+
+  /**
+   * @brief 获取灾害易发生时间段
+   * @param period 查询出的时间段，格式如 "20-21"
+   * @param errorMessage 失败时的错误信息
+   * @return 成功返回 true
+   */
+  static bool getDisasterPronePeriod(QString *period, QString *errorMessage);
+
+  /**
+   * @brief 获取灾害趋势统计数据 (包括当日/本月及其环比)
+   * @param stats 用于接收统计结果的结构体
+   * @param errorMessage 失败时的错误信息
+   * @return 成功返回 true
+   */
+  static bool getDisasterTrends(DisasterTrendStats *stats, QString *errorMessage);
+
+  /**
+   * @brief 获取当前最高频与最罕见灾害类型
+   * @param stats 用于接收结果的结构体
+   * @param errorMessage 失败时的错误信息
+   * @return 成功返回 true
+   */
+  static bool getDisasterFrequencyStats(DisasterFrequencyStats *stats, QString *errorMessage);
+
+  /**
+   * @brief 获取大屏实时监测面板统计数据 (未分配、今日已解决、处理中)
+   * @param stats 用于接收结果的结构体
+   * @param errorMessage 失败时的错误信息
+   * @return 成功返回 true
+   */
+  static bool getRealtimeMonitoringStats(DisasterRealtimeStats *stats, QString *errorMessage);
 
   /**
    * @brief 根据指定日期查询当天发生或录入的灾害记录
@@ -230,6 +275,7 @@ public:
                                             const QString &dateTo,
                                             QMap<QString, int> *result,
                                             QString *errorMessage);
+>>>>>>> Stashed changes
 };
 
 #endif // DISASTERDAO_H

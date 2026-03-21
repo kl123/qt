@@ -1,102 +1,71 @@
+# 灾害预警系统 - 数据大屏统计接口文档 (C++ API)
 
-## 接口一：根据日期查询灾害列表（`getDisastersByDate`）
+以下接口为专门面向前端大屏展示（如灾害态势、实时监测等模块）新增的数据聚合接口，底层统一采用 `app_sqlite` 连接池调用 SQLite。
 
-### 功能描述
+## 1. 获取灾害易发生时间段
+此接口用于分析所有历史灾害记录的发生时间，通过分组聚合，返回最易发生灾害的时段区间。
 
-输入一个具体日期，返回该日期当天**发生**（`occurred_at`）的所有灾害记录列表。
-适用于「今日灾害速览」「历史某天复盘」等场景。
+- **接口定义**
+  ```cpp
+  static bool getDisasterPronePeriod(QString *period, QString *errorMessage);
+  ```
+- **返回参数**：
+  - `period`: `QString*` 格式化好的时间段字符串（例如 `"20-21"`）。若无数据则返回 `"暂无数据"`。
+  - `errorMessage`: `QString*` 发生错误时的排错详情。
+  - `return bool`: 成功返回 `true`。
 
-### 接口定义
+## 2. 获取灾害趋势统计（当日/本月及环比）
+综合展示灾害基数及增量变化情况。用于前端展示“当日发生数”、“本月累计数”以及它们的环比发生率（增长率）。
 
-```cpp
-static bool getDisastersByDate(const QString& date,
-                               QList<DisasterRecord>* records,
-                               QString* errorMessage);
-```
+- **接口定义**
+  ```cpp
+  struct DisasterTrendStats {
+    int todayCount = 0;
+    double todayYoY = 0.0; // 今日环比(%)，例如 40.5 表示 40.5%
+    int monthCount = 0;
+    double monthYoY = 0.0; // 本月环比(%)
+  };
+  
+  static bool getDisasterTrends(DisasterTrendStats *stats, QString *errorMessage);
+  ```
+- **返回参数**
+  - `stats`: `DisasterTrendStats*` 包含统计信息的结构体实例。
+  - `errorMessage`: `QString*` 错误提示。
+  - `return bool`: 成功返回 `true`。
 
-### 输入参数
+## 3. 获取最高频与最罕见灾害类型
+对数据库中的灾害类型进行自动聚合汇总，识别出当前极端的分布情况。
 
-| 参数名   | 类型               | 必填 | 说明                                                         |
-| -------- | ------------------ | ---- | ------------------------------------------------------------ |
-| `date` | `const QString&` | 是   | 日期字符串，格式严格为 `"YYYY-MM-DD"`，如 `"2025-03-14"` |
+- **接口定义**
+  ```cpp
+  struct DisasterFrequencyStats {
+    QString mostFrequentType;  // 最高频灾害名称
+    int mostFrequentCount = 0; // 最高频数量
+    QString rarestType;        // 最罕见灾害名称
+    int rarestCount = 0;       // 最罕见数量
+  };
+  
+  static bool getDisasterFrequencyStats(DisasterFrequencyStats *stats, QString *errorMessage);
+  ```
+- **返回参数**
+  - `stats`: `DisasterFrequencyStats*` 包含最高频项与罕见项信息的结构体数据。
+  - `errorMessage`: `QString*` 错误提示。
+  - `return bool`: 成功返回 `true`。
 
-### 输出参数 / 返回值
+## 4. 获取实时监测任务统计
+针对处置任务系统周期的生命态势监测，统计系统当前的处置负荷和当天工作成效。
 
-| 参数名           | 类型                       | 说明                                                    |
-| ---------------- | -------------------------- | ------------------------------------------------------- |
-| `records`      | `QList<DisasterRecord>*` | 查询到的灾害记录列表（按 `occurred_at` 升序排列）     |
-| `errorMessage` | `QString*`               | 失败时填入具体错误描述                                  |
-| *(return)*     | `bool`                   | 查询成功返回 `true`；参数非法或 DB 异常返回 `false` |
-
-> **注意**：查询结果为空（当天无灾害）时函数仍返回 `true`，`records` 为空列表。
-
-### 调用示例
-
-```cpp
-QList<DisasterRecord> records;
-QString err;
-if (DisasterDao::getDisastersByDate("2025-03-14", &records, &err)) {
-    for (const auto& r : records)
-        qDebug() << r.disasterType << r.location << r.occurredAt;
-    // 输出示例：火灾  某某路1号  2025-03-14 09:30:00
-} else {
-    qWarning() << err;
-}
-```
-
----
-
-## 接口二：按日期范围统计各灾害类型数量（`countDisasterTypesByDateRange`）
-
-### 功能描述
-
-输入起始日期和截止日期，统计该时间段内（按 `occurred_at`）各灾害类型的发生次数，返回 `QMap<QString, int>` 形式的统计结果。
-适用于「月报/季报数据汇总」「灾害类型趋势分析」「大屏统计展示」等场景。
-
-### 接口定义
-
-```cpp
-static bool countDisasterTypesByDateRange(const QString& dateFrom,
-                                          const QString& dateTo,
-                                          QMap<QString, int>* result,
-                                          QString* errorMessage);
-```
-
-### 输入参数
-
-| 参数名       | 类型               | 必填 | 说明                                                           |
-| ------------ | ------------------ | ---- | -------------------------------------------------------------- |
-| `dateFrom` | `const QString&` | 是   | 起始日期，格式 `"YYYY-MM-DD"`，查询时自动补全为 `00:00:00` |
-| `dateTo`   | `const QString&` | 是   | 截止日期，格式 `"YYYY-MM-DD"`，查询时自动补全为 `23:59:59` |
-
-### 输出参数 / 返回值
-
-| 参数名           | 类型                    | 说明                                                    |
-| ---------------- | ----------------------- | ------------------------------------------------------- |
-| `result`       | `QMap<QString, int>*` | 统计结果，key=灾害类型，value=发生次数，按数量降序排列  |
-| `errorMessage` | `QString*`            | 失败时填入具体错误描述                                  |
-| *(return)*     | `bool`                | 统计成功返回 `true`；参数非法或 DB 异常返回 `false` |
-
-### 返回结果示例
-
-```
-{
-  "洪涝": 4,
-  "火灾": 2,
-  "地震": 1
-}
-```
-
-### 调用示例
-
-```cpp
-QMap<QString, int> stats;
-QString err;
-if (DisasterDao::countDisasterTypesByDateRange("2025-01-01", "2025-12-31", &stats, &err)) {
-    for (auto it = stats.cbegin(); it != stats.cend(); ++it)
-        qDebug() << it.key() << ":" << it.value() << "次";
-    // 输出示例：洪涝:4次  火灾:2次  地震:1次
-} else {
-    qWarning() << err;
-}
-```
+- **接口定义**
+  ```cpp
+  struct DisasterRealtimeStats {
+    int unassignedCount = 0;    // 未分配的灾害数
+    int resolvedTodayCount = 0; // 今日已解决数（进度满且在今天收到的单子）
+    int processingCount = 0;    // 正在处理中（已指派但未完结）
+  };
+  
+  static bool getRealtimeMonitoringStats(DisasterRealtimeStats *stats, QString *errorMessage);
+  ```
+- **返回参数**
+  - `stats`: `DisasterRealtimeStats*` 实时监测统计结果。
+  - `errorMessage`: `QString*` 错误提示。
+  - `return bool`: 成功返回 `true`。
