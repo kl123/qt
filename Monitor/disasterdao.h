@@ -213,8 +213,6 @@ public:
       bool hasSeverityMax, int severityMax, const QString &occurredAtFrom,
       const QString &occurredAtTo, int limit, int offset,
       QList<DisasterRecord> *records, QString *errorMessage);
-<<<<<<< Updated upstream
-=======
 
   // === 数据统计接口 ===
 
@@ -275,7 +273,6 @@ public:
                                             const QString &dateTo,
                                             QMap<QString, int> *result,
                                             QString *errorMessage);
->>>>>>> Stashed changes
 };
 
 #endif // DISASTERDAO_H
