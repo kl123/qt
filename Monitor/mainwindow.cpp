@@ -19,18 +19,21 @@
 #include <iostream>
 #include <QSplitter>
 #include <opencv2/opencv.hpp>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QCoreApplication>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), imageLabel(new QLabel(this)),
       croppedLabel(new QLabel(this)), logTextEdit(new QTextEdit(this)),
-      startButton(new QPushButton("模式1:关键词监测", this)),
+      startButton(new QPushButton("区域监测", this)),
       stopButton(new QPushButton("停止监测", this)),
       AreaButton(new QPushButton("区域选定", this)),
       configButton(new QPushButton("参数配置", this)), timer(new QTimer(this)),
       testAlertButton(new QPushButton("测试警告", this)),
       viewHistoryButton(new QPushButton("查看历史", this)),
       viewDbHistoryButton(new QPushButton("查看入库消息", this)),
-      continuousDetectButton(new QPushButton("模式2:屏幕变化检测", this)),
+      continuousDetectButton(new QPushButton("打开图片", this)),
       continuousTimer(new QTimer(this)), isContinuousDetecting(false) {
   std::cout << "OpenCV version: " << CV_VERSION << std::endl;
   cv::Mat testImg = cv::Mat::zeros(100, 100, CV_8UC3);
@@ -580,25 +583,198 @@ void MainWindow::onContinuousCapture() {
                                       Qt::SmoothTransformation));
 }
 void MainWindow::mode2() {
-  DisasterQuery q;
-  q.severityMin = 0;
-  q.orderBy = DisasterQuery::OrderBy::SeverityDesc;
+    // 停止当前可能正在运行的监测
+       if (isContinuousDetecting || timer->isActive()) {
+           stopAllMonitoring();
+       }
 
-  QList<DisasterRecord> records;
-  QString err;
-  // 注意：传入 &records 接收查询结果
-  if (DisasterDao::queryDisasters(q, &records, &err)) {
-    qDebug() << "查询成功，找到" << records.size() << "条记录";
-    for (const auto &record : records) {
-      qDebug() << "ID:" << record.id << "类型:" << record.disasterType
-               << "严重等级:" << record.severity
-               << "灾害内容:" << record.content
-               << "系统报警时间:" << record.systemAlarmAt
-               << "发生时间:" << record.occurredAt;
+       // 1. 打开文件选择对话框
+       QString filePath = QFileDialog::getOpenFileName(
+           this,
+           tr("选择图片文件"),
+           QDir::homePath(),
+           tr("图片文件 (*.png *.xpm *.jpg *.bmp *.jpeg *.gif);;所有文件 (*)")
+       );
+
+       // 用户取消选择
+       if (filePath.isEmpty()) {
+           logTextEdit->append("[模式2] 用户取消选择图片");
+           return;
+       }
+
+       logTextEdit->append(QString("[模式2] 已选择图片：%1").arg(filePath));
+
+       // 2. 处理选中的图片
+       processLocalImage(filePath);
+}
+// 处理本地图片 OCR 识别（直接识别整图，绝不裁剪）
+void MainWindow::processLocalImage(const QString &filePath) {
+    // 1. 验证文件是否存在
+    QFileInfo fileInfo(filePath);
+    if (!fileInfo.exists()) {
+        logTextEdit->append("<font color='red'><b>[模式 2] 文件不存在！</b></font>");
+        return;
     }
-  } else {
-    qDebug() << "查询失败:" << err;
-  }
+
+    // 2. 读取图片为 QImage
+    QImage image(filePath);
+    if (image.isNull()) {
+        logTextEdit->append("<font color='red'><b>[模式 2] 图片加载失败！</b></font>");
+        return;
+    }
+
+    logTextEdit->append(QString("[模式 2] 图片尺寸：%1 x %2 像素")
+                            .arg(image.width())
+                            .arg(image.height()));
+
+    // 3. 转换为 OpenCV Mat (BGR 格式)
+    cv::Mat currentFrame;
+    if (image.format() != QImage::Format_RGB888 &&
+        image.format() != QImage::Format_RGBA8888) {
+        image = image.convertToFormat(QImage::Format_RGB888);
+    }
+
+    if (image.format() == QImage::Format_RGB888) {
+        currentFrame = cv::Mat(image.height(), image.width(), CV_8UC3,
+                               (uchar *)image.bits(), image.bytesPerLine());
+        cv::cvtColor(currentFrame, currentFrame, cv::COLOR_RGB2BGR);
+    } else {
+        currentFrame = cv::Mat(image.height(), image.width(), CV_8UC4,
+                               (uchar *)image.bits(), image.bytesPerLine());
+        cv::cvtColor(currentFrame, currentFrame, cv::COLOR_RGBA2BGR);
+    }
+
+    // 4. 显示原始图片（左侧）
+    cv::Mat displayOriginal = currentFrame.clone();
+    cv::cvtColor(displayOriginal, displayOriginal, cv::COLOR_BGR2RGB);
+    QImage imgOriginal(displayOriginal.data, displayOriginal.cols,
+                       displayOriginal.rows, displayOriginal.step,
+                       QImage::Format_RGB888);
+    imageLabel->setPixmap(QPixmap::fromImage(imgOriginal)
+                              .scaled(imageLabel->size(), Qt::KeepAspectRatio,
+                                      Qt::SmoothTransformation));
+    imageLabel->setText("");
+
+    // 5. 右侧 Label 明确提示：无裁剪
+    croppedLabel->clear();
+    croppedLabel->setText("ℹ️ 模式 2：整图识别，未进行任何裁剪");
+
+    // 6. 执行 OCR 识别（直接对整图识别）
+    logTextEdit->append("<font color='blue'><b>[模式 2] 正在执行 OCR 识别...</b></font>");
+    QCoreApplication::processEvents();
+
+    OcrHelper ocrHelper;
+    QString ocrText = ocrHelper.recognizeText(currentFrame);
+
+    // 7. 显示识别结果
+    logTextEdit->append(
+        QString("[%1] [模式 2] OCR 识别完成，文本长度：%2字符")
+            .arg(QDateTime::currentDateTime().toString("HH:mm:ss"))
+            .arg(ocrText.length()));
+
+    if (ocrText.isEmpty()) {
+        logTextEdit->append("<i>(未识别到有效文字)</i>");
+        return;  // 无内容则提前结束
+    } else {
+        logTextEdit->append("<b>========== OCR 识别结果 ==========</b>");
+        logTextEdit->append(ocrText);
+        logTextEdit->append("<b>==================================</b>");
+    }
+
+    // 8. AI 智能分析（可选，根据配置）
+    QSettings settings("MyCompany", "MonitorApp");
+    bool aiEnabled = settings.value("aiEnabled", false).toBool();
+
+    if (aiEnabled && !ocrText.isEmpty()) {
+        logTextEdit->append(
+            "<font color='blue'><b>[AI] 正在进行智能灾害分析...</b></font>");
+        QCoreApplication::processEvents();
+
+        // 读取 AI 配置
+        QString aiUrl =
+            settings
+                .value("aiApiUrl", "https://ark.cn-beijing.volces.com/api/v3")
+                .toString();
+        QString aiKey =
+            settings.value("aiApiKey", "d42f588f-420d-4a52-9c1f-d25feae6cba8")
+                .toString();
+        QString aiModel =
+            settings.value("aiModel", "deepseek-v3-2-251201").toString();
+
+        DisasterAnalyzer analyzer;
+        analyzer.setAiEnabled(aiEnabled);
+        analyzer.setAiConfig(aiUrl, aiKey, aiModel);
+
+        // 创建并显示 AI 分析弹窗
+        AiAnalysisDialog *aiDialog = new AiAnalysisDialog(this);
+        aiDialog->setWindowTitle("AI 灾害分析");
+        connect(&analyzer, &DisasterAnalyzer::log, aiDialog,
+                &AiAnalysisDialog::appendLog);
+        aiDialog->show();
+        QCoreApplication::processEvents();
+
+        // 执行分析
+        DisasterRecord rec = analyzer.analyze(ocrText);
+        rec.dispatcherId = UserAuth::currentUser.id;
+
+        aiDialog->appendLog("\n✅ 分析流程结束。");
+
+        // 【关键修复】严格判断是否为灾害信息
+        // 必须同时满足：isDisaster == true 且 至少有一个关键字段非空
+        bool isRealDisaster = rec.isDisaster &&
+                              (!rec.disasterType.isEmpty() || !rec.location.isEmpty());
+
+        if (!isRealDisaster) {
+            logTextEdit->append(
+                "<font color='gray'><b>[AI] 判定为非灾害信息或数据无效，已自动拦截，不进行入库。</b></font>");
+            return;  // ← 关键！阻止后续所有操作
+        }
+
+        // 只有确认是灾害才入库
+        qint64 id;
+        QString err;
+        if (DisasterDao::createDisaster(rec, &id, &err)) {
+            logTextEdit->append(
+                QString("<font color='green'><b>[AI 分析结果] 成功入库，ID: %1</b></font>")
+                    .arg(id));
+            logTextEdit->append(
+                QString(" - <b>灾害类型：</b>%1").arg(rec.disasterType));
+            logTextEdit->append(
+                QString(" - <b>具体地点：</b>%1").arg(rec.location));
+            logTextEdit->append(
+                QString(" - <b>严重等级：</b>%1 级").arg(rec.severity));
+            logTextEdit->append(
+                QString(" - <b>发生时间：</b>%1").arg(rec.occurredAt));
+        } else {
+            logTextEdit->append(
+                QString("<font color='red'><b>[系统操作] 灾害入库失败：%1</b></font>")
+                    .arg(err));
+        }
+    }
+
+    // 9. 关键词报警检测（备用方案，仅当 AI 未启用时生效）
+    if (!aiEnabled && !ocrText.isEmpty()) {
+        QStringList alertKeywords = settings.value("keywords").toStringList();
+        bool keywordFound = false;
+        QString triggerReason;
+
+        for (const QString &keyword : alertKeywords) {
+            if (ocrText.contains(keyword, Qt::CaseInsensitive)) {
+                keywordFound = true;
+                triggerReason = QString("包含关键词：%1").arg(keyword);
+                break;
+            }
+        }
+
+        if (keywordFound) {
+            logTextEdit->append(
+                QString("<font color='red'><b>[报警触发] %1</b></font>")
+                    .arg(triggerReason));
+            m_imageProcessor.StartAlert();
+        }
+    }
+
+    logTextEdit->moveCursor(QTextCursor::End);
 }
 void MainWindow::mode1() {
   // 1. 先停止当前可能正在运行的连续检测（避免重复启动）

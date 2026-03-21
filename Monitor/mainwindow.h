@@ -93,6 +93,8 @@ private:
     QString m_lastOcrText;
     // 辅助函数：提取新增文字
     QString extractNewText(const QString& oldText, const QString& newText);
+
+    void processLocalImage(const QString &filePath);
 };
 
 #endif // MAINWINDOW_H

@@ -18,8 +18,9 @@
 #include <QTimer>
 #include <QSettings>
 
-#include "disasterdao.h"    // 确保包含 DisasterRecord 定义
-#include "userauth.h"       // 确保包含 AuthUser 定义
+// 确保包含数据结构定义
+#include "disasterdao.h"
+#include "userauth.h"
 
 namespace Ui {
 class overview;
@@ -40,9 +41,9 @@ private:
 
     // UI 初始化与数据加载
     void initTableUI();
-    void fillFakeData();
+    void fillFakeData(); // 保留以防万一，目前主要用 InitialData
     void InitialData();
-    void refreshTable(); // 新增：刷新表格
+    void refreshTable();
 
     // 辅助功能
     QWidget* createActionWidget(qint64 id);
@@ -50,8 +51,8 @@ private:
     void performAssignTask(qint64 disasterId);
 
     // 核心业务逻辑
-    void addInfo(const DisasterRecord &record); // 修改：接收结构体参数
-    void addInfo(); // 保留无参版本以防旧代码调用，但内部不再使用硬编码
+    void addInfo(const DisasterRecord &record);
+    void addInfo(); // 兼容旧代码
 
 private slots:
     // 现有操作

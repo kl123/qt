@@ -134,17 +134,61 @@ void index::setupTopNav()
         t->show();
     });
     connect(outbtn,&QPushButton::clicked, [=](){
-        int ret = QMessageBox::question(this, "确认退出",
-                    "确定要退出登录吗？\n系统将关闭所有页面并返回登录界面。",
-                    QMessageBox::Yes | QMessageBox::No);
-        if (ret == QMessageBox::Yes) {
-            QSettings settings("System", "disaster");
-            settings.remove("userid");
-            settings.remove("role");
-            Login *loginWnd = new Login();
-            loginWnd->show();
-            this->close();
-        }
+        QMessageBox msgBox(this);
+                msgBox.setWindowTitle("确认退出");
+
+                // 1. 设置大字体
+                QFont font("Microsoft YaHei", 14);
+                msgBox.setFont(font);
+                msgBox.setInformativeText("确定要退出登录吗？");
+                msgBox.setIconPixmap(QPixmap()); // 去掉图标
+                msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+
+                // 修改按钮文字
+                QPushButton *btnYes = qobject_cast<QPushButton*>(msgBox.button(QMessageBox::Yes));
+                QPushButton *btnNo = qobject_cast<QPushButton*>(msgBox.button(QMessageBox::No));
+                if (btnYes) btnYes->setText("确认");
+                if (btnNo) btnNo->setText("取消");
+
+                // 2. 【关键修改】强制重置内部样式，对抗全局深色背景
+                // 这段样式会强制让 MessageBox 内部的 Label 背景变白/透明，按钮变回灰色
+                msgBox.setStyleSheet(R"(
+                    QMessageBox {
+                        background-color: #ffffff; /* 对话框背景纯白 */
+                    }
+                    QMessageBox QLabel {
+                        color: #000000;          /* 文字黑色 */
+                        background-color: transparent; /* 强制去掉文字背后的深色块 */
+                        border: none;            /* 去掉边框 */
+                        padding: 5px;
+                    }
+                    QMessageBox QPushButton {
+                        background-color: #f0f0f0; /* 按钮默认浅灰 */
+                        color: #000000;
+                        border: 1px solid #cccccc;
+                        border-radius: 4px;
+                        padding: 6px 15px;
+                        min-width: 80px;
+                    }
+                    QMessageBox QPushButton:hover {
+                        background-color: #e0e0e0; /* 鼠标悬停稍深 */
+                        border-color: #999999;
+                    }
+                    QMessageBox QPushButton:pressed {
+                        background-color: #d0d0d0; /* 按下更深 */
+                    }
+                )");
+
+                int ret = msgBox.exec();
+
+                if (ret == QMessageBox::Yes) {
+                    QSettings settings("System", "disaster");
+                    settings.remove("userid");
+                    settings.remove("role");
+                    Login *loginWnd = new Login();
+                    loginWnd->show();
+                    this->close();
+                }
     });
 
     QList<QPushButton*> navBtns = {btnRealTime, btnFireAlarm,  btnNational, btnConfig, outbtn};
@@ -564,55 +608,79 @@ void index::applyGlobalStyle()
 
 void index::GetData()
 {
-    QList<DisasterRecord> records;
+    QList<DisasterRecord> records; // 本地变量
     QString err;
     QString targetDateStr = "";
+
     if (dateSelector) {
         targetDateStr = dateSelector->date().toString("yyyy-MM-dd");
     } else {
         targetDateStr = QDate::currentDate().toString("yyyy-MM-dd");
     }
 
-    if (DisasterDao::getDisastersByDate(targetDateStr, &records, &err)) {
-        updateLineChart(records);
-    } else {
+    // 【修改点】先判断数据库调用结果，再决定做什么
+    bool success = DisasterDao::getDisastersByDate(targetDateStr, &records, &err);
+
+    if (!success) {
         qWarning() << "获取数据失败 (" << targetDateStr << "):" << err;
-        updateLineChart(QList<DisasterRecord>());
+        // 强制清空 records，确保它是真的空且状态健康
+        records.clear();
     }
+
+    // 统一调用，传入本地变量 records
+    // 无论成功与否，records 现在都是一个合法的 QList（要么有数据，要么被 clear() 过）
+    updateLineChart(records);
 }
 
 void index::updateLineChart(const QList<DisasterRecord> &records)
 {
     if (!lineSeries || !scatterSeries || !axisX || !axisY) return;
-    lineSeries->clear();
-    scatterSeries->clear();
-    pointDataMap.clear();
 
-    if (records.isEmpty()) {
-        axisX->setRange(0, 1);
-        axisY->setRange(0, 10);
-        return;
-    }
+        lineSeries->clear();
+        scatterSeries->clear();
 
-    QMap<qint64, int> timeToMaxSeverityMap;
-    QMap<qint64, QList<DisasterRecord>> timeToRecordsMap;
-
-    for (const auto &rec : records) {
-        QDateTime dt = QDateTime::fromString(rec.occurredAt, "yyyy-MM-dd HH:mm:ss");
-        if (dt.isValid()) {
-            qint64 timestamp = dt.toMSecsSinceEpoch();
-            if (!timeToMaxSeverityMap.contains(timestamp) || rec.severity > timeToMaxSeverityMap[timestamp]) {
-                timeToMaxSeverityMap[timestamp] = rec.severity;
-            }
-            timeToRecordsMap[timestamp].append(rec);
+        // 【修改点】安全清空 map
+        if (!pointDataMap.isEmpty()) {
+            pointDataMap.clear();
         }
-    }
 
-    QList<qint64> timestamps = timeToMaxSeverityMap.keys();
-    std::sort(timestamps.begin(), timestamps.end());
+        // 【修改点】再次确认 records 是否真的可用
+        if (records.isEmpty()) {
+            axisX->setRange(0, 1);
+            axisY->setRange(0, 10);
+            return;
+        }
 
-    qint64 minTime = timestamps.first();
-    qint64 maxTime = timestamps.last();
+        QMap<qint64, int> timeToMaxSeverityMap;
+        QMap<qint64, QList<DisasterRecord>> timeToRecordsMap;
+
+        // 【修改点】遍历时加保护
+        for (const auto &rec : records) {
+            // 防止 rec 内部数据非法导致崩溃（虽然少见，但防一手）
+            if (rec.occurredAt.isEmpty()) continue;
+
+            QDateTime dt = QDateTime::fromString(rec.occurredAt, "yyyy-MM-dd HH:mm:ss");
+            if (dt.isValid()) {
+                qint64 timestamp = dt.toMSecsSinceEpoch();
+                if (!timeToMaxSeverityMap.contains(timestamp) || rec.severity > timeToMaxSeverityMap[timestamp]) {
+                    timeToMaxSeverityMap[timestamp] = rec.severity;
+                }
+                timeToRecordsMap[timestamp].append(rec);
+            }
+        }
+
+        if (timeToMaxSeverityMap.isEmpty()) {
+            axisX->setRange(0, 1);
+            axisY->setRange(0, 10);
+            return;
+        }
+
+        QList<qint64> timestamps = timeToMaxSeverityMap.keys();
+        std::sort(timestamps.begin(), timestamps.end());
+
+        qint64 minTime = timestamps.first();
+        qint64 maxTime = timestamps.last();
+
     if (minTime == maxTime) {
         minTime -= 3600000; maxTime += 3600000;
     } else {

@@ -15,9 +15,9 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QDateTime>
+#include <QWindow>
 
 // ================= 内部类：添加灾害对话框 =================
-// 直接在 cpp 中定义，无需额外头文件
 class AddDisasterDialog : public QDialog {
 public:
     explicit AddDisasterDialog(QWidget *parent = nullptr) : QDialog(parent) {
@@ -29,7 +29,6 @@ public:
         mainLayout->setSpacing(15);
         mainLayout->setContentsMargins(20, 20, 20, 20);
 
-        // 标题提示
         QLabel *titleLabel = new QLabel("请填写详细的灾情信息：");
         titleLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #333;");
         mainLayout->addWidget(titleLabel);
@@ -39,20 +38,17 @@ public:
         formLayout->setLabelAlignment(Qt::AlignRight);
         formLayout->setVerticalSpacing(12);
 
-        // 1. 灾害类型
         comboType = new QComboBox();
         comboType->addItems({"火灾", "水灾", "地震", "台风", "泥石流", "交通事故", "危化品泄漏", "其他"});
         comboType->setCurrentText("火灾");
         comboType->setMinimumHeight(30);
         formLayout->addRow("灾害类型:", comboType);
 
-        // 2. 发生地点
         editLocation = new QLineEdit();
         editLocation->setPlaceholderText("例如：XX省XX市XX区XX街道...");
         editLocation->setMinimumHeight(30);
         formLayout->addRow("发生地点:", editLocation);
 
-        // 3. 发生时间
         editTime = new QDateTimeEdit();
         editTime->setDateTime(QDateTime::currentDateTime());
         editTime->setDisplayFormat("yyyy-MM-dd HH:mm:ss");
@@ -60,7 +56,6 @@ public:
         editTime->setMinimumHeight(30);
         formLayout->addRow("发生时间:", editTime);
 
-        // 4. 严重程度 (0-5)
         spinSeverity = new QSpinBox();
         spinSeverity->setRange(0, 5);
         spinSeverity->setSuffix(" 级");
@@ -68,7 +63,6 @@ public:
         spinSeverity->setMinimumHeight(30);
         formLayout->addRow("严重程度:", spinSeverity);
 
-        // 5. 灾害详情
         editContent = new QLineEdit();
         editContent->setPlaceholderText("简要描述灾害现场情况、伤亡预估等...");
         editContent->setMinimumHeight(30);
@@ -77,7 +71,6 @@ public:
         mainLayout->addLayout(formLayout);
         mainLayout->addStretch();
 
-        // 按钮区域
         QHBoxLayout *btnLayout = new QHBoxLayout();
         btnLayout->addStretch();
 
@@ -89,12 +82,7 @@ public:
         btnConfirm->setMinimumWidth(80);
         btnConfirm->setMinimumHeight(35);
         btnConfirm->setStyleSheet(R"(
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                font-weight: bold;
-                border-radius: 4px;
-            }
+            QPushButton { background-color: #4CAF50; color: white; font-weight: bold; border-radius: 4px; }
             QPushButton:hover { background-color: #45a049; }
             QPushButton:pressed { background-color: #388E3C; }
         )");
@@ -117,17 +105,16 @@ public:
         mainLayout->addLayout(btnLayout);
     }
 
-    // 获取填充好的结构体
     DisasterRecord getRecord() const {
         DisasterRecord rec;
-        rec.id = 0; // 新建时ID为0，由数据库生成
+        rec.id = 0;
         rec.disasterType = comboType->currentText();
         rec.location = editLocation->text().trimmed();
         rec.occurredAt = editTime->dateTime().toString("yyyy-MM-dd HH:mm:ss");
         rec.content = editContent->text().trimmed();
         rec.severity = spinSeverity->value();
         rec.isDisaster = true;
-        rec.dispatcherId = 0; // 默认未分配，或由调用者设置
+        rec.dispatcherId = 0;
         rec.createdAt = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
         rec.systemAlarmAt = rec.createdAt;
         return rec;
@@ -141,6 +128,129 @@ private:
     QLineEdit *editContent;
 };
 
+// ================= 内部类：编辑灾害对话框 (新增) =================
+class EditDisasterDialog : public QDialog {
+public:
+    explicit EditDisasterDialog(const DisasterRecord &record, QWidget *parent = nullptr)
+        : QDialog(parent), m_originalRecord(record) {
+
+        setWindowTitle(QString("修改灾情记录 - ID: %1").arg(record.id));
+        setModal(true);
+        resize(500, 450);
+
+        QVBoxLayout *mainLayout = new QVBoxLayout(this);
+        mainLayout->setSpacing(15);
+        mainLayout->setContentsMargins(20, 20, 20, 20);
+
+        QLabel *titleLabel = new QLabel("请修改灾情详细信息：");
+        titleLabel->setStyleSheet("font-weight: bold; font-size: 14px; color: #333;");
+        mainLayout->addWidget(titleLabel);
+
+        QFormLayout *formLayout = new QFormLayout();
+        formLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+        formLayout->setLabelAlignment(Qt::AlignRight);
+        formLayout->setVerticalSpacing(12);
+
+        comboType = new QComboBox();
+        comboType->addItems({"火灾", "水灾", "地震", "台风", "泥石流", "交通事故", "危化品泄漏", "其他"});
+        comboType->setCurrentText(record.disasterType);
+        comboType->setMinimumHeight(30);
+        formLayout->addRow("灾害类型:", comboType);
+
+        editLocation = new QLineEdit();
+        editLocation->setText(record.location);
+        editLocation->setPlaceholderText("例如：XX省XX市XX区XX街道...");
+        editLocation->setMinimumHeight(30);
+        formLayout->addRow("发生地点:", editLocation);
+
+        editTime = new QDateTimeEdit();
+        editTime->setDateTime(QDateTime::fromString(record.occurredAt, "yyyy-MM-dd HH:mm:ss"));
+        editTime->setDisplayFormat("yyyy-MM-dd HH:mm:ss");
+        editTime->setCalendarPopup(true);
+        editTime->setMinimumHeight(30);
+        formLayout->addRow("发生时间:", editTime);
+
+        spinSeverity = new QSpinBox();
+        spinSeverity->setRange(0, 5);
+        spinSeverity->setSuffix(" 级");
+        spinSeverity->setValue(record.severity);
+        spinSeverity->setMinimumHeight(30);
+        formLayout->addRow("严重程度:", spinSeverity);
+
+        editContent = new QLineEdit();
+        editContent->setText(record.content);
+        editContent->setPlaceholderText("简要描述灾害现场情况...");
+        editContent->setMinimumHeight(30);
+        formLayout->addRow("灾害详情:", editContent);
+
+        mainLayout->addLayout(formLayout);
+        mainLayout->addStretch();
+
+        QHBoxLayout *btnLayout = new QHBoxLayout();
+        btnLayout->addStretch();
+
+        QPushButton *btnCancel = new QPushButton("取消");
+        btnCancel->setMinimumWidth(80);
+        btnCancel->setMinimumHeight(35);
+
+        QPushButton *btnConfirm = new QPushButton("保存修改");
+        btnConfirm->setMinimumWidth(80);
+        btnConfirm->setMinimumHeight(35);
+        btnConfirm->setStyleSheet(R"(
+            QPushButton { background-color: #2196F3; color: white; font-weight: bold; border-radius: 4px; }
+            QPushButton:hover { background-color: #1976D2; }
+            QPushButton:pressed { background-color: #0D47A1; }
+        )");
+
+        connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
+        connect(btnConfirm, &QPushButton::clicked, this, [this]() {
+            if (editLocation->text().trimmed().isEmpty()) {
+                QMessageBox::warning(this, "验证失败", "发生地点不能为空！");
+                return;
+            }
+            if (editContent->text().trimmed().isEmpty()) {
+                QMessageBox::warning(this, "验证失败", "灾害详情不能为空！");
+                return;
+            }
+            accept();
+        });
+
+        btnLayout->addWidget(btnCancel);
+        btnLayout->addWidget(btnConfirm);
+        mainLayout->addLayout(btnLayout);
+    }
+
+    DisasterPatch getPatch() const {
+        DisasterPatch patch;
+        patch.id = m_originalRecord.id;
+
+        patch.disasterType = comboType->currentText();
+
+        patch.hasLocation = true;
+        patch.location = editLocation->text().trimmed();
+
+        patch.hasOccurredAt = true;
+        patch.occurredAt = editTime->dateTime().toString("yyyy-MM-dd HH:mm:ss");
+
+        patch.hasSeverity = true;
+        patch.severity = spinSeverity->value();
+
+        patch.hasContent = true;
+        patch.content = editContent->text().trimmed();
+
+        return patch;
+    }
+
+private:
+    DisasterRecord m_originalRecord;
+    QComboBox *comboType;
+    QLineEdit *editLocation;
+    QDateTimeEdit *editTime;
+    QSpinBox *spinSeverity;
+    QLineEdit *editContent;
+};
+// =======================================================================
+
 // ================= overview 类实现 =================
 
 overview::overview(QWidget *parent)
@@ -151,12 +261,20 @@ overview::overview(QWidget *parent)
     this->setWindowTitle("灾情总览");
     this->resize(1200, 600);
 
+    // 【关键修改】处理窗口标题栏按钮
+    // 1. 去掉默认的问号帮助按钮
+    setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    // 2. 添加最小化和最大化按钮
+    setWindowFlags(windowFlags() | Qt::WindowMinimizeButtonHint | Qt::WindowMaximizeButtonHint);
+
+    // 注意：如果在 show() 之后修改 flags 需要重新 show，但在构造函数中修改是安全的
+
     // 初始化主布局
     mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(20, 20, 20, 20);
     mainLayout->setSpacing(10);
 
-    // --- 新增：顶部工具栏 ---
+    // --- 顶部工具栏 ---
     QHBoxLayout *topBarLayout = new QHBoxLayout();
     topBarLayout->setContentsMargins(0, 0, 0, 10);
 
@@ -170,11 +288,8 @@ overview::overview(QWidget *parent)
     btnAdd->setMinimumWidth(120);
     btnAdd->setStyleSheet(R"(
         QPushButton#btnAdd {
-            background-color: #2196F3;
-            color: white;
-            font-weight: bold;
-            border-radius: 4px;
-            border: none;
+            background-color: #2196F3; color: white; font-weight: bold;
+            border-radius: 4px; border: none;
         }
         QPushButton#btnAdd:hover { background-color: #1976D2; }
         QPushButton#btnAdd:pressed { background-color: #0D47A1; }
@@ -187,7 +302,6 @@ overview::overview(QWidget *parent)
     topBarLayout->addWidget(btnAdd);
 
     mainLayout->addLayout(topBarLayout);
-    // -----------------------
 
     // 初始化表格UI
     initTableUI();
@@ -206,7 +320,6 @@ overview::~overview()
 
 void overview::initTableUI()
 {
-    // 1. 创建表格，列数 9
     disasterTable = new QTableWidget(0, 9, this);
 
     QStringList headers = {
@@ -215,45 +328,25 @@ void overview::initTableUI()
     };
     disasterTable->setHorizontalHeaderLabels(headers);
 
-    // 2. 表格样式美化
     disasterTable->setStyleSheet(R"(
         QTableWidget {
-            border: 1px solid #E0E0E0;
-            border-radius: 8px;
-            gridline-color: #E0E0E0;
-            background-color: #FFFFFF;
-            font-size: 13px;
-            color: #333333;
+            border: 1px solid #E0E0E0; border-radius: 8px;
+            gridline-color: #E0E0E0; background-color: #FFFFFF;
+            font-size: 13px; color: #333333;
             alternate-background-color: #F5F7FA;
         }
         QTableWidget::horizontalHeader {
-            background-color: #2196F3;
-            color: #FFFFFF;
-            font-weight: bold;
-            font-size: 14px;
-            height: 35px;
-            border: none;
+            background-color: #2196F3; color: #FFFFFF;
+            font-weight: bold; font-size: 14px; height: 35px; border: none;
         }
         QTableWidget::horizontalHeader::section {
-            border: none;
-            padding: 8px;
-            border-right: 1px solid #1976D2;
+            border: none; padding: 8px; border-right: 1px solid #1976D2;
         }
-        QTableWidget::horizontalHeader::section:last {
-            border-right: none;
-        }
-        QTableWidget::item:selected {
-            background-color: #BBDEFB;
-            color: #1976D2;
-        }
+        QTableWidget::horizontalHeader::section:last { border-right: none; }
+        QTableWidget::item:selected { background-color: #BBDEFB; color: #1976D2; }
         QPushButton {
-            border: none;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            margin: 2px;
-            cursor: pointer;
+            border: none; color: white; padding: 4px 8px;
+            border-radius: 4px; font-size: 12px; margin: 2px; cursor: pointer;
         }
         QPushButton#btnAssign { background-color: #4CAF50; }
         QPushButton#btnAssign:hover { background-color: #45a049; }
@@ -263,16 +356,14 @@ void overview::initTableUI()
         QPushButton#btnDelete:hover { background-color: #da190b; }
     )");
 
-    // 3. 表格功能配置
     disasterTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     disasterTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     disasterTable->setSelectionMode(QAbstractItemView::SingleSelection);
     disasterTable->verticalHeader()->setVisible(false);
     disasterTable->horizontalHeader()->setStretchLastSection(false);
 
-    // 列宽策略
     for (int i = 0; i < 8; ++i) {
-        if (i == 4) { // 灾害详情列拉伸
+        if (i == 4) {
             disasterTable->horizontalHeader()->setSectionResizeMode(i, QHeaderView::Stretch);
         } else {
             disasterTable->horizontalHeader()->setSectionResizeMode(i, QHeaderView::ResizeToContents);
@@ -281,7 +372,6 @@ void overview::initTableUI()
     disasterTable->horizontalHeader()->setSectionResizeMode(8, QHeaderView::Fixed);
     disasterTable->setColumnWidth(8, 180);
 
-    // 4. 将表格加入主布局
     mainLayout->addWidget(disasterTable);
 }
 
@@ -295,12 +385,10 @@ void overview::InitialData()
     QList<DisasterRecord> unassigned;
     QString err;
 
-    // 获取未分配的灾情
     bool querySuccess = DisasterDao::getUnassignedDisastersByDispatcher(userId, 50, 0, &unassigned, &err);
 
     if (!querySuccess) {
         qDebug() << "查询失败:" << err;
-        // 仅在非空错误时提示，避免频繁打扰
         if (!err.isEmpty()) {
              QMessageBox::warning(this, "错误", "加载灾情数据失败:\n" + err);
         }
@@ -309,7 +397,6 @@ void overview::InitialData()
 
     if (unassigned.isEmpty()) {
         qDebug() << "暂无未分配的灾情记录。";
-        // 可选：添加一行提示文字
         return;
     }
 
@@ -369,7 +456,7 @@ void overview::InitialData()
 
 void overview::fillFakeData()
 {
-    // 保留备用，目前不使用
+    // 备用
 }
 
 QWidget* overview::createActionWidget(qint64 id)
@@ -496,22 +583,18 @@ void overview::performAssignTask(qint64 disasterId)
     dialog->deleteLater();
 }
 
-// ================= 槽函数实现 =================
-
 void overview::onAddDisasterClicked()
 {
     AddDisasterDialog dialog(this);
     if (dialog.exec() == QDialog::Accepted) {
         DisasterRecord newRecord = dialog.getRecord();
 
-        // 获取当前用户ID作为调度员ID（如果需要自动关联当前人为调度员）
         QSettings settings("System", "disaster");
         qint64 currentUserId = settings.value("userid", 0).toLongLong();
         if (currentUserId != 0) {
             newRecord.dispatcherId = currentUserId;
         }
 
-        // 调用核心逻辑保存
         addInfo(newRecord);
     }
 }
@@ -523,10 +606,8 @@ void overview::addInfo(const DisasterRecord &record)
 
     if (DisasterDao::createDisaster(record, &newId, &err)) {
         qDebug() << "灾害添加成功，新 ID:" << newId;
-
         QMessageBox::information(this, "成功",
             QString("灾情记录已添加！\n类型：%1\n地点：%2").arg(record.disasterType).arg(record.location));
-
         refreshTable();
     } else {
         qDebug() << "灾害添加失败:" << err;
@@ -534,7 +615,6 @@ void overview::addInfo(const DisasterRecord &record)
     }
 }
 
-// 兼容旧调用的空实现，建议不再使用
 void overview::addInfo() {
     qWarning() << "调用了无参 addInfo()，请使用带参数的版本。";
 }
@@ -543,20 +623,69 @@ void overview::onAssignClicked()
 {
     QPushButton *btn = qobject_cast<QPushButton*>(sender());
     if (!btn) return;
-
     qint64 id = btn->property("recordId").toLongLong();
-    qDebug() << "点击了指派按钮，记录 ID:" << id;
-
     performAssignTask(id);
 }
 
+// ================= 核心修改：完善编辑功能 =================
 void overview::onEditClicked()
 {
     QPushButton *btn = qobject_cast<QPushButton*>(sender());
     if (!btn) return;
+
     qint64 id = btn->property("recordId").toLongLong();
-    QMessageBox::information(this, "提示", QString("正在编辑灾情 ID: %1 (功能开发中)").arg(id));
-    // TODO: 打开编辑窗口
+
+    // 1. 从表格中获取当前行的数据
+    int targetRow = -1;
+    DisasterRecord currentRecord;
+    bool found = false;
+
+    for (int i = 0; i < disasterTable->rowCount(); ++i) {
+        QTableWidgetItem *idItem = disasterTable->item(i, 0);
+        if (idItem && idItem->text().toLongLong() == id) {
+            targetRow = i;
+            currentRecord.id = id;
+            currentRecord.disasterType = disasterTable->item(i, 1)->text();
+            currentRecord.location = disasterTable->item(i, 2)->text();
+            currentRecord.occurredAt = disasterTable->item(i, 3)->text();
+            currentRecord.content = disasterTable->item(i, 4)->text();
+
+            // 还原严重程度文本到数字
+            QString sevText = disasterTable->item(i, 5)->text();
+            if (sevText.contains("特重")) currentRecord.severity = 5;
+            else if (sevText.contains("严重")) currentRecord.severity = 4;
+            else if (sevText.contains("较重")) currentRecord.severity = 3;
+            else if (sevText.contains("中等")) currentRecord.severity = 2;
+            else if (sevText.contains("较轻")) currentRecord.severity = 1;
+            else currentRecord.severity = 0;
+
+            currentRecord.dispatcherId = disasterTable->item(i, 6)->text().toLongLong();
+            currentRecord.createdAt = disasterTable->item(i, 7)->text();
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        QMessageBox::warning(this, "错误", "未找到对应的灾情记录，请刷新后重试。");
+        return;
+    }
+
+    // 2. 弹出编辑对话框
+    EditDisasterDialog dialog(currentRecord, this);
+    if (dialog.exec() == QDialog::Accepted) {
+        // 3. 获取修改后的数据包
+        DisasterPatch patch = dialog.getPatch();
+        QString err;
+
+        // 4. 调用数据库更新接口
+        if (DisasterDao::updateDisaster(patch, &err)) {
+            QMessageBox::information(this, "成功", "灾情信息已更新！");
+            refreshTable();
+        } else {
+            QMessageBox::critical(this, "失败", "更新失败:\n" + err);
+        }
+    }
 }
 
 void overview::onDeleteClicked()

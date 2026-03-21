@@ -2,9 +2,9 @@
 #define TASK_H
 
 #include <QDialog>
-#include <QTableWidget> // 新增包含
+#include <QTableWidget>
 #include <QList>
-#include "disasterdao.h" // 确保包含结构体定义
+#include "disasterdao.h"
 
 namespace Ui {
 class task;
@@ -19,15 +19,19 @@ public:
     ~task();
 
 private slots:
-    // 新增：处理按钮点击
+    // 处理按钮点击
     void onUpdateProgressClicked(qint64 taskId, qint64 disasterId, int currentProgress);
+    // 确认更新进度
+    void onConfirmProgressUpdate(qint64 taskId, int newProgress);
 
 private:
     Ui::task *ui;
-    QTableWidget *m_table; // 新增：表格指针
+    QTableWidget *m_table;
 
-    void initUI();         // 新增：初始化 UI
-    void SeekInfo();       // 原有的数据加载
+    void initUI();
+    void SeekInfo();
+    void setupWindowFlags();  // 设置窗口标志（移除问号，添加全屏/最小化）
+    void showProgressDialog(qint64 taskId, qint64 disasterId, int currentProgress);  // 显示进度更新对话框
 };
 
 #endif // TASK_H
