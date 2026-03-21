@@ -23,6 +23,7 @@ DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000
 DEFINES += _Frees_ptr_opt_=
 
 SOURCES += \
+    forgetpwd.cpp \
     fuzhu.cpp \
     image.cpp \
     disasteranalyzer.cpp \
@@ -49,6 +50,7 @@ SOURCES += \
 HEADERS += \
     disasteranalyzer.h \
     disasterdao.h \
+    forgetpwd.h \
     fuzhu.h \
     image.h \
     index.h \
@@ -62,6 +64,7 @@ HEADERS += \
     aianalysisdialog.h
 
 FORMS += \
+    forgetpwd.ui \
     fuzhu.ui \
     index.ui \
     login.ui \

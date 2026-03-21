@@ -91,6 +91,10 @@ public:
                                      qint64 unitId, qint64 *userId,
                                      QString *errorMessage);
 
+  // 重置密码（直接修改指定用户的密码，无权限校验）
+  static bool resetPassword(const QString &username, const QString &newPassword,
+                            QString *errorMessage);
+
   // 用户登录
   static bool login(const QString &username, const QString &password,
                     AuthUser *user, QString *errorMessage);

@@ -2,6 +2,9 @@
 // Qt核心库
 #include <QCoreApplication>
 #include <QSizePolicy>
+#include <QFormLayout>
+#include <QDialogButtonBox>
+#include "forgetpwd.h"
 #include <QButtonGroup>
 #include <QVariant>
 #include <QColor>
@@ -276,6 +279,11 @@ void Login::buildLoginTab()
     // 原有信号槽
     connect(m_btnLogin, &QPushButton::clicked, this, &Login::on_btnLogin_clicked);
     connect(m_btnLoginCancel, &QPushButton::clicked, this, &Login::on_btnLoginCancel_clicked);
+
+    // 新增：忘记密码和回车登录信号槽
+    connect(m_btnForgetPwd, &QPushButton::clicked, this, &Login::on_btnForgetPwd_clicked);
+    connect(m_leLoginPwd, &QLineEdit::returnPressed, this, &Login::on_btnLogin_clicked);
+    connect(m_leLoginUser, &QLineEdit::returnPressed, this, &Login::on_btnLogin_clicked);
 }
 
 // 注册标签页（核心修复显示不全 + 保留美化）
@@ -650,11 +658,11 @@ void Login::on_btnLoginCancel_clicked()
     this->reject();
 }
 
-// 新增：忘记密码点击槽函数（你后续实现密码找回逻辑即可）
+// 新增：忘记密码点击槽函数（美化后的重置密码面板）
 void Login::on_btnForgetPwd_clicked()
 {
-    // 暂留空，你可以加弹窗/跳转到密码找回页面
-    QMessageBox::information(this, "提示", "密码找回功能正在开发中！");
+    ForgetPwd dlg(this);
+    dlg.exec();
 }
 
 void Login::on_rbtnDispatcher_toggled(bool checked)

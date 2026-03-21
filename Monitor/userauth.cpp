@@ -708,6 +708,61 @@ bool UserAuth::registerUserWithUnitId(const QString &username,
                     userId, errorMessage);
 }
 
+bool UserAuth::resetPassword(const QString &username, const QString &newPassword, QString *errorMessage) {
+  if (username.trimmed().isEmpty()) {
+    if (errorMessage) {
+      *errorMessage = "用户名不能为空";
+    }
+    return false;
+  }
+  if (newPassword.isEmpty()) {
+    if (errorMessage) {
+      *errorMessage = "新密码不能为空";
+    }
+    return false;
+  }
+
+  QString connError;
+  if (!ensureSqliteConnection(&connError)) {
+    if (errorMessage) {
+      *errorMessage = connError;
+    }
+    return false;
+  }
+  QSqlDatabase db = QSqlDatabase::database("app_sqlite");
+
+  QString schemaError;
+  if (!ensureUnitSchema(db, &schemaError)) {
+    if (errorMessage) {
+      *errorMessage = schemaError;
+    }
+    return false;
+  }
+
+  QSqlQuery query(db);
+  query.prepare("UPDATE users SET password = ? WHERE username = ?;");
+  
+  const QString storedPassword = hashPasswordForStorage(newPassword);
+  query.addBindValue(storedPassword);
+  query.addBindValue(username.trimmed());
+
+  if (!query.exec()) {
+    if (errorMessage) {
+      *errorMessage = query.lastError().text();
+    }
+    return false;
+  }
+
+  if (query.numRowsAffected() == 0) {
+    if (errorMessage) {
+      *errorMessage = "用户不存在";
+    }
+    return false;
+  }
+
+  return true;
+}
+
 bool UserAuth::login(const QString &username, const QString &password,
                      AuthUser *user, QString *errorMessage) {
   if (username.trimmed().isEmpty()) {

@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ForgetPwd</class>
+ <widget class="QDialog" name="ForgetPwd">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>360</width>
+    <height>260</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>安全验证 - 修改密码</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QDialog { background-color: #FFFFFF; }</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing">
+    <number>15</number>
+   </property>
+   <property name="leftMargin">
+    <number>30</number>
+   </property>
+   <property name="topMargin">
+    <number>25</number>
+   </property>
+   <property name="rightMargin">
+    <number>30</number>
+   </property>
+   <property name="bottomMargin">
+    <number>25</number>
+   </property>
+   <item>
+    <widget class="QLabel" name="titleLabel">
+     <property name="styleSheet">
+      <string notr="true">font-size: 18px; font-weight: bold; color: #333333; letter-spacing: 2px;</string>
+     </property>
+     <property name="text">
+      <string>密 码 重 置</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Fixed</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>10</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QLineEdit" name="userEdit">
+     <property name="styleSheet">
+      <string notr="true">QLineEdit {
+    border: 1px solid #DCDFE6;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #333333;
+    background-color: #FFFFFF;
+    min-height: 32px;
+}
+QLineEdit:focus {
+    border: 1px solid #2F54EB;
+    background-color: #F4F6FB;
+}
+QLineEdit::placeholder {
+    color: #909399;
+}</string>
+     </property>
+     <property name="placeholderText">
+      <string>请输入要修改的用户名</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLineEdit" name="pwdEdit">
+     <property name="styleSheet">
+      <string notr="true">QLineEdit {
+    border: 1px solid #DCDFE6;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #333333;
+    background-color: #FFFFFF;
+    min-height: 32px;
+}
+QLineEdit:focus {
+    border: 1px solid #2F54EB;
+    background-color: #F4F6FB;
+}
+QLineEdit::placeholder {
+    color: #909399;
+}</string>
+     </property>
+     <property name="echoMode">
+      <enum>QLineEdit::Password</enum>
+     </property>
+     <property name="placeholderText">
+      <string>请输入新密码</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="verticalSpacer_2">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeType">
+      <enum>QSizePolicy::Expanding</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <property name="spacing">
+      <number>15</number>
+     </property>
+     <item>
+      <widget class="QPushButton" name="btnOk">
+       <property name="cursor">
+        <cursorShape>PointingHandCursor</cursorShape>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #2F54EB;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 0;
+    font-size: 14px;
+    min-height: 34px;
+}
+QPushButton:hover { background-color: #1D39C4; }
+QPushButton:pressed { background-color: #182E99; }</string>
+       </property>
+       <property name="text">
+        <string>确认修改</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnCancel">
+       <property name="cursor">
+        <cursorShape>PointingHandCursor</cursorShape>
+       </property>
+       <property name="styleSheet">
+        <string notr="true">QPushButton {
+    background-color: #F0F2F5;
+    color: #333333;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 0;
+    font-size: 14px;
+    min-height: 34px;
+}
+QPushButton:hover { background-color: #E5E6EB; }
+QPushButton:pressed { background-color: #C9CDD4; }</string>
+       </property>
+       <property name="text">
+        <string>取 消</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
