@@ -1,3 +1,4 @@
+release/forgetpwd.o
 release/fuzhu.o
 release/image.o
 release/disasteranalyzer.o
@@ -22,6 +23,7 @@ release/OcrUtils.o
 release/clipper.o
 release/qrc_audio.o
 release/moc_disasteranalyzer.o
+release/moc_forgetpwd.o
 release/moc_fuzhu.o
 release/moc_index.o
 release/moc_login.o

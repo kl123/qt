@@ -1,3 +1,4 @@
+debug/forgetpwd.o
 debug/fuzhu.o
 debug/image.o
 debug/disasteranalyzer.o
@@ -22,6 +23,7 @@ debug/OcrUtils.o
 debug/clipper.o
 debug/qrc_audio.o
 debug/moc_disasteranalyzer.o
+debug/moc_forgetpwd.o
 debug/moc_fuzhu.o
 debug/moc_index.o
 debug/moc_login.o

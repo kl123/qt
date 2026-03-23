@@ -30,6 +30,15 @@ MonitorConfig::MonitorConfig(QWidget *parent)
     , m_loopTimer(new QTimer(this))
 {
     setWindowTitle("设置");
+    // 1. 获取当前标志
+    Qt::WindowFlags flags = this->windowFlags();
+    // 2. 去掉帮助按钮 (?)
+    flags &= ~Qt::WindowContextHelpButtonHint;
+    // 3. 加上最小化和最大化按钮
+    flags |= Qt::WindowMinimizeButtonHint;
+    flags |= Qt::WindowMaximizeButtonHint;
+    // 4. 应用新标志
+    this->setWindowFlags(flags);
     resize(400, 550); // 稍微调高一点以容纳 AI 设置
 
     // === 音频设置 ===
@@ -97,19 +106,20 @@ MonitorConfig::MonitorConfig(QWidget *parent)
 
     // === AI 配置 (新) ===
     m_aiEnableCheck = new QCheckBox("启用 AI 分析 (推荐火山引擎 DeepSeek)", this);
-    
+
     m_aiUrlEdit = new QLineEdit(this);
     m_aiUrlEdit->setPlaceholderText("https://ark.cn-beijing.volces.com/api/v3");
     m_aiUrlEdit->setText("https://ark.cn-beijing.volces.com/api/v3"); // 默认火山引擎
-    
+
     m_aiKeyEdit = new QLineEdit(this);
     m_aiKeyEdit->setEchoMode(QLineEdit::Password);
     m_aiKeyEdit->setPlaceholderText("d42f588f-..."); // 示例 Key
-    
+
     // 添加获取 Key 的链接
     QLabel *getKeyLabel = new QLabel("<a href='https://console.volcengine.com/ark/region:ark+cn-beijing/endpoint'>点击此处获取火山引擎 API Key</a>", this);
     getKeyLabel->setOpenExternalLinks(true);
-    getKeyLabel->setStyleSheet("QLabel { color: blue; text-decoration: underline; }");
+    // 移除之前的蓝色样式，让它继承默认或下面的重置样式
+    getKeyLabel->setStyleSheet("");
     getKeyLabel->setCursor(Qt::PointingHandCursor);
 
     m_aiModelEdit = new QLineEdit(this);
@@ -187,6 +197,50 @@ MonitorConfig::MonitorConfig(QWidget *parent)
 
     // 加载上次保存的设置
     loadSettings();
+
+    // === 【关键修改】强制重置本窗口内所有控件为系统默认样式 ===
+    // 这会覆盖掉全局样式中的蓝色背景，让按钮变回灰白色，文字变回黑色
+    this->setStyleSheet(R"(
+        /* 重置所有 QPushButton 为原生外观 */
+        QPushButton {
+            background-color: #f0f0f0; /* 默认浅灰背景 */
+            color: #000000;            /* 黑色文字 */
+            border: 1px solid #adadad; /* 默认灰色边框 */
+            border-radius: 3px;        /* 轻微圆角 */
+            padding: 5px 15px;         /* 内边距 */
+            font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+            font-size: 9pt;
+        }
+
+        /* 鼠标悬停时的效果 */
+        QPushButton:hover {
+            background-color: #e6e6e6;
+            border-color: #0078d7;     /* 悬停时显示系统蓝边框 */
+            color: #000000;
+        }
+
+        /* 鼠标按下时的效果 */
+        QPushButton:pressed {
+            background-color: #cccccc;
+            border-color: #005499;
+            color: #000000;
+        }
+
+        /* 确保 Label 背景透明，文字黑色 */
+        QLabel {
+            color: #000000;
+            background-color: transparent;
+            border: none;
+            padding: 2px;
+        }
+
+        /* 特别修复超链接颜色，保持蓝色下划线但去除背景 */
+        QLabel a {
+            color: #0066cc;
+            text-decoration: underline;
+            background-color: transparent;
+        }
+    )");
 }
 
 MonitorConfig::~MonitorConfig()
@@ -344,7 +398,7 @@ void MonitorConfig::playAlertSound()
     m_currentLoop++;
 
     if (m_targetLoops != 1) {
-        int durationMs = 2500; 
+        int durationMs = 2500;
         m_loopTimer->start(durationMs);
     }
 }
@@ -446,7 +500,7 @@ void MonitorConfig::loadSettings()
 
     // AI 设置
     m_aiEnableCheck->setChecked(settings.value("aiEnabled", false).toBool());
-    
+
     // 如果没有保存过 URL，使用默认值
     QString savedUrl = settings.value("aiApiUrl", "").toString();
     if (savedUrl.isEmpty()) {
@@ -455,7 +509,7 @@ void MonitorConfig::loadSettings()
     m_aiUrlEdit->setText(savedUrl);
 
     m_aiKeyEdit->setText(settings.value("aiApiKey", "d42f588f-420d-4a52-9c1f-d25feae6cba8").toString());
-    
+
     // 如果没有保存过模型，使用默认值
     QString savedModel = settings.value("aiModel", "").toString();
     if (savedModel.isEmpty()) {
