@@ -721,8 +721,23 @@ void MainWindow::processLocalImage(const QString &filePath) {
 
         // 【关键修复】严格判断是否为灾害信息
         // 必须同时满足：isDisaster == true 且 至少有一个关键字段非空
-        bool isRealDisaster = rec.isDisaster &&
-                              (!rec.disasterType.isEmpty() || !rec.location.isEmpty());
+        auto hasMeaningfulValue = [](const QString &value, const QStringList &invalidValues) {
+            const QString normalized = value.trimmed().toLower();
+            if (normalized.isEmpty()) {
+                return false;
+            }
+            for (const QString &invalid : invalidValues) {
+                if (normalized == invalid.toLower()) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        bool hasValidType = hasMeaningfulValue(
+            rec.disasterType, {"未知灾害", "未知", "无", "none", "null", "n/a", "非灾害"});
+        bool hasValidLocation = hasMeaningfulValue(
+            rec.location, {"未知地点", "未知", "无", "none", "null", "n/a"});
+        bool isRealDisaster = rec.isDisaster && (hasValidType || hasValidLocation);
 
         if (!isRealDisaster) {
             logTextEdit->append(
@@ -994,28 +1009,43 @@ void MainWindow::newOCR() {
         // 分析完成后，可以追加一条完成日志
         aiDialog->appendLog("\n✅ 分析流程结束。");
 
-        // 如果 AI 明确判定为非灾害，或返回的是空记录，则不进行入库
-        if (!rec.isDisaster || (rec.disasterType.isEmpty() && rec.location.isEmpty())) {
+        auto hasMeaningfulValue = [](const QString &value, const QStringList &invalidValues) {
+            const QString normalized = value.trimmed().toLower();
+            if (normalized.isEmpty()) {
+                return false;
+            }
+            for (const QString &invalid : invalidValues) {
+                if (normalized == invalid.toLower()) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        bool hasValidType = hasMeaningfulValue(
+            rec.disasterType, {"未知灾害", "未知", "无", "none", "null", "n/a", "非灾害"});
+        bool hasValidLocation = hasMeaningfulValue(
+            rec.location, {"未知地点", "未知", "无", "none", "null", "n/a"});
+        bool isRealDisaster = rec.isDisaster && (hasValidType || hasValidLocation);
+
+        if (!isRealDisaster) {
              logTextEdit->append(
                 "<font color='gray'><b>[AI] 判定为非灾害信息，已自动拦截，不进行后续预警或入库。</b></font>");
-             return;
-        }
-
-        qint64 id;
-        QString err;
-        // 成功后 id 会被赋值
-        if (DisasterDao::createDisaster(rec, &id, &err)) {
-          qDebug() << "灾害记录创建成功，ID:" << id
-                   << " 类型:" << rec.disasterType;
-          logTextEdit->append(
-              QString("<font color='green'><b>[AI 分析结果] 成功入库，ID: %1</b></font>").arg(id));
-          logTextEdit->append(QString(" - <b>灾害类型：</b>%1").arg(rec.disasterType));
-          logTextEdit->append(QString(" - <b>具体地点：</b>%1").arg(rec.location));
-          logTextEdit->append(QString(" - <b>严重等级：</b>%1 级").arg(rec.severity));
-          logTextEdit->append(QString(" - <b>发生时间：</b>%1").arg(rec.occurredAt));
         } else {
-          qDebug() << "创建失败:" << err;
-          logTextEdit->append(QString("<font color='red'><b>[系统操作] 灾害入库失败: %1</b></font>").arg(err));
+          qint64 id;
+          QString err;
+          if (DisasterDao::createDisaster(rec, &id, &err)) {
+            qDebug() << "灾害记录创建成功，ID:" << id
+                     << " 类型:" << rec.disasterType;
+            logTextEdit->append(
+                QString("<font color='green'><b>[AI 分析结果] 成功入库，ID: %1</b></font>").arg(id));
+            logTextEdit->append(QString(" - <b>灾害类型：</b>%1").arg(rec.disasterType));
+            logTextEdit->append(QString(" - <b>具体地点：</b>%1").arg(rec.location));
+            logTextEdit->append(QString(" - <b>严重等级：</b>%1 级").arg(rec.severity));
+            logTextEdit->append(QString(" - <b>发生时间：</b>%1").arg(rec.occurredAt));
+          } else {
+            qDebug() << "创建失败:" << err;
+            logTextEdit->append(QString("<font color='red'><b>[系统操作] 灾害入库失败: %1</b></font>").arg(err));
+          }
         }
       }
 

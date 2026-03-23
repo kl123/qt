@@ -27,23 +27,22 @@ void DisasterAnalyzer::setAiEnabled(bool enabled)
 
 DisasterRecord DisasterAnalyzer::analyze(const QString& text)
 {
-    // 如果启用了 AI 且配置了 Key，优先尝试 AI 分析
     if (m_aiEnabled && !m_apiKey.isEmpty()) {
         DisasterRecord aiRecord = analyzeWithAi(text);
-        
-        // 1. 如果 AI 识别出具体灾害类型，直接采用
+
+        if (!aiRecord.isDisaster) {
+            return aiRecord;
+        }
+
         if (!aiRecord.disasterType.isEmpty() && aiRecord.disasterType != "未知灾害") {
             return aiRecord;
         }
-        
+
         qDebug() << "AI 未识别出具体灾害类型(结果为: " << aiRecord.disasterType << ")，转由规则引擎分析...";
-        
-        // 2. 否则使用规则分析
+
         DisasterRecord ruleRecord = analyzeWithRules(text);
-        
-        // 3. 结果合并优化：如果规则也没识别出类型，但 AI 识别出了地点，保留 AI 的地点
+
         if (ruleRecord.disasterType == "未知灾害" && aiRecord.location != "未知地点") {
-            // 如果规则也没找到地点，或者规则找到的是默认值
             if (ruleRecord.location == "未知地点") {
                 ruleRecord.location = aiRecord.location;
                 qDebug() << "合并 AI 提取的地点信息:" << aiRecord.location;
@@ -59,27 +58,25 @@ DisasterRecord DisasterAnalyzer::analyze(const QString& text)
 DisasterRecord DisasterAnalyzer::analyzeWithRules(const QString& text)
 {
     DisasterRecord record;
-    
-    // 1. 预处理文本
+
     QString cleanText = preprocess(text);
     record.content = cleanText;
 
-    // 2. 提取灾害类型
     record.disasterType = extractType(cleanText);
     if (record.disasterType.isEmpty()) {
-        record.disasterType = "未知灾害"; // 默认值
+        record.disasterType = "未知灾害";
+        record.isDisaster = false;
+    } else {
+        record.isDisaster = true;
     }
 
-    // 3. 提取地点
     record.location = extractLocation(cleanText);
     if (record.location.isEmpty()) {
-        record.location = "未知地点"; // 默认值
+        record.location = "未知地点";
     }
 
-    // 4. 提取严重等级
     record.severity = extractSeverity(cleanText);
 
-    // 5. 提取发生时间（优先从文本中提取，否则使用当前时间）
     QString extractedTime = extractTime(cleanText);
     if (!extractedTime.isEmpty()) {
         record.occurredAt = extractedTime;
@@ -87,7 +84,6 @@ DisasterRecord DisasterAnalyzer::analyzeWithRules(const QString& text)
         record.occurredAt = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
     }
 
-    // 系统告警时间通常是收到消息的时间
     record.systemAlarmAt = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
 
     return record;
@@ -205,7 +201,7 @@ DisasterRecord DisasterAnalyzer::analyzeWithAi(const QString& text)
                               }
                               
                               emit log("⚖️ AI 判定结果：【⚠️ 确认灾害/紧急事件】");
-                              
+                              record.isDisaster = true;
                               record.disasterType = resultObj["disasterType"].toString("未知灾害");
                               record.location = resultObj["location"].toString("未知地点");
                               record.severity = resultObj["severity"].toInt(3);
@@ -303,7 +299,7 @@ DisasterRecord DisasterAnalyzer::analyzeWithAi(const QString& text)
                     }
                     
                     emit log("⚖️ AI 判定结果：【⚠️ 确认灾害/紧急事件】");
-                    
+                    record.isDisaster = true;
                     record.disasterType = resultObj["disasterType"].toString("未知灾害");
                     record.location = resultObj["location"].toString("未知地点");
                     record.severity = resultObj["severity"].toInt(3);
